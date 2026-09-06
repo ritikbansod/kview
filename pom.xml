@@ -12,16 +12,21 @@
   </parent>
 
   <groupId>com.ritikbansod</groupId>
-  <artifactId>kafka-wrapper</artifactId>
-  <version>1.0.0</version>
-  <name>kafka-wrapper</name>
-  <description>REST abstraction over Apache Kafka for topic management and message production/consumption</description>
+  <artifactId>kview</artifactId>
+  <version>2.0.0</version>
+  <name>Kview</name>
+  <description>Kview: multi-cluster web UI and REST API for Apache Kafka with data explorer, live tail, consumer groups and PLAINTEXT/mTLS/SASL/OAuth support</description>
 
   <properties>
     <java.version>21</java.version>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>1.11.3</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -36,7 +41,16 @@
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.kafka</groupId>
+      <artifactId>spring-kafka-test</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
