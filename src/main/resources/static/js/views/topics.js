@@ -171,26 +171,46 @@ export async function renderTopicDetail(view, topic) {
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title"><h2>Partitions</h2>
-        <span class="faint small">click a partition row to filter its history below</span></div>
-      <div class="table-wrap"><table class="tbl">
-        <thead><tr><th>Partition</th><th class="num">Leader</th><th>Replicas</th><th>ISR</th><th class="num">Beginning</th><th class="num">End</th><th class="num">Messages</th></tr></thead>
-        <tbody id="partitions-tbody">
-          ${detail.partitions.map((p) => `
-            <tr data-partition="${p.partition}" title="Show p${p.partition} history" style="cursor:pointer">
-              <td class="mono">${p.partition}</td>
-              <td class="num">${p.leader < 0 ? badge('none', 'err') : p.leader}</td>
-              <td class="mono small">${p.replicas.join(', ')}</td>
-              <td>${p.isr.length < p.replicas.length
-                ? `<span class="mono small" style="color:var(--warn)">${p.isr.join(', ')}</span>`
-                : `<span class="mono small muted">${p.isr.join(', ')}</span>`}</td>
-              <td class="num">${fmtNum(p.beginningOffset)}</td>
-              <td class="num">${fmtNum(p.endOffset)}</td>
-              <td class="num">${fmtNum(p.messageCount)}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table></div>
+    <div class="two-col-topic">
+      <div class="card collapsible" id="card-partitions">
+        <div class="card-title collapsible-title" data-collapse="partitions-body">
+          <h2>Partitions</h2>
+          <span class="chev">▾</span>
+        </div>
+        <div class="collapsible-body">
+          <div class="table-wrap"><table class="tbl">
+            <thead><tr><th>Partition</th><th class="num">Leader</th><th>Replicas</th><th>ISR</th><th class="num">Beginning</th><th class="num">End</th><th class="num">Messages</th></tr></thead>
+            <tbody id="partitions-tbody">
+              ${detail.partitions.map((p) => `
+                <tr data-partition="${p.partition}" title="Show p${p.partition} history" style="cursor:pointer">
+                  <td class="mono">${p.partition}</td>
+                  <td class="num">${p.leader < 0 ? badge('none', 'err') : p.leader}</td>
+                  <td class="mono small">${p.replicas.join(', ')}</td>
+                  <td>${p.isr.length < p.replicas.length
+                    ? `<span class="mono small" style="color:var(--warn)">${p.isr.join(', ')}</span>`
+                    : `<span class="mono small muted">${p.isr.join(', ')}</span>`}</td>
+                  <td class="num">${fmtNum(p.beginningOffset)}</td>
+                  <td class="num">${fmtNum(p.endOffset)}</td>
+                  <td class="num">${fmtNum(p.messageCount)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="card collapsible collapsed" id="card-configs">
+        <div class="card-title collapsible-title" data-collapse="configs-body">
+          <h2>Configs</h2>
+          <span class="chev">▾</span>
+        </div>
+        <div class="collapsible-body">
+          <div style="margin-bottom:8px"><input type="text" id="config-search" placeholder="Filter configs…" style="width:100%" /></div>
+          <div class="table-wrap" style="max-height:420px; overflow-y:auto"><table class="tbl">
+            <thead><tr><th>Name</th><th>Value</th><th>Source</th><th></th></tr></thead>
+            <tbody id="config-rows">${configRows(detail.configs, '')}</tbody>
+          </table></div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -238,16 +258,16 @@ export async function renderTopicDetail(view, topic) {
         </div>
       </div>
       <div id="hist-body"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title"><h2>Configs</h2>
-        <input type="text" id="config-search" placeholder="Filter configs…" style="width:200px" /></div>
-      <div class="table-wrap" style="max-height:420px; overflow-y:auto"><table class="tbl">
-        <thead><tr><th>Name</th><th>Value</th><th>Source</th><th></th></tr></thead>
-        <tbody id="config-rows">${configRows(detail.configs, '')}</tbody>
-      </table></div>
     </div>`;
+
+
+  // ---- collapsible cards (click header to expand/collapse) ----
+  view.querySelectorAll('.collapsible-title').forEach((title) => {
+    title.addEventListener('click', (e) => {
+      if (e.target.closest('input, select, button')) return;
+      title.closest('.collapsible').classList.toggle('collapsed');
+    });
+  });
 
   // ---- partition history interactions ----
   const histBody = view.querySelector('#hist-body');
@@ -284,6 +304,33 @@ export async function renderTopicDetail(view, topic) {
   });
   view.querySelectorAll('th[data-matrix-partition]').forEach((th) => {
     th.addEventListener('click', () => setHistoryFilter(Number(th.dataset.matrixPartition), true));
+  });
+
+  // replica placement: flow/matrix view toggle + per-card history buttons
+  const flowEl = view.querySelector('#rp-flow');
+  const matrixEl = view.querySelector('#rp-matrix');
+  const flowBtn = view.querySelector('#rp-flow-btn');
+  const matrixBtn = view.querySelector('#rp-matrix-btn');
+  const showMatrix = (show) => {
+    if (!flowEl || !matrixEl) return;
+    flowEl.style.display = show ? 'none' : '';
+    matrixEl.style.display = show ? '' : 'none';
+    flowBtn.classList.toggle('primary', !show);
+    matrixBtn.classList.toggle('primary', show);
+  };
+  flowBtn?.addEventListener('click', () => showMatrix(true));
+  matrixBtn?.addEventListener('click', () => showMatrix(false));
+  view.querySelectorAll('.pcard').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.pcard-hist')) return;
+      setHistoryFilter(Number(card.dataset.p), true);
+    });
+  });
+  view.querySelectorAll('.pcard-hist').forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setHistoryFilter(Number(b.dataset.p), true);
+    });
   });
   renderHistoryBody();
 
