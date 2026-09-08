@@ -144,8 +144,10 @@ export async function renderTopicDetail(view, topic) {
   const [detail, brokers, history] = await Promise.all([
     get(clusterPath() + `/topics/${encodeURIComponent(topic)}`),
     get(clusterPath() + '/brokers').catch(() => []),
-    get(clusterPath() + `/topics/${encodeURIComponent(topic)}/history?limit=100`).catch(() => null),
+    get(clusterPath() + `/topics/${encodeURIComponent(topic)}/history?limit=300`).catch(() => null),
   ]);
+  const historyEvents = history?.events || [];
+  let historyFilter = '';
   const totalMessages = detail.partitions.reduce((sum, p) => sum + p.messageCount, 0);
 
   view.innerHTML = `
@@ -170,44 +172,72 @@ export async function renderTopicDetail(view, topic) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h2>Replica placement</h2>
-        <span class="faint small">which broker holds what — L leader · F in-sync follower · F* out of sync</span></div>
-      <div class="table-wrap"><table class="tbl matrix">
-        <thead><tr><th>Broker</th>${detail.partitions.map((p) => `<th class="num">p${p.partition}</th>`).join('')}</tr></thead>
-        <tbody>
-          ${brokers.map((b) => `
-            <tr>
-              <td class="mono">${b.id < 0 ? badge('offline', 'err') : `broker ${b.id}`} <span class="faint small">${esc(b.host)}:${esc(b.port)}</span></td>
-              ${detail.partitions.map((p) => {
-                const cell = roleCell(b.id, p);
-                return `<td class="num"><span class="role-cell ${cell.cls}">${cell.label}</span></td>`;
-              }).join('')}
+      <div class="card-title"><h2>Partitions</h2>
+        <span class="faint small">click a partition row to filter its history below</span></div>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Partition</th><th class="num">Leader</th><th>Replicas</th><th>ISR</th><th class="num">Beginning</th><th class="num">End</th><th class="num">Messages</th></tr></thead>
+        <tbody id="partitions-tbody">
+          ${detail.partitions.map((p) => `
+            <tr data-partition="${p.partition}" title="Show p${p.partition} history" style="cursor:pointer">
+              <td class="mono">${p.partition}</td>
+              <td class="num">${p.leader < 0 ? badge('none', 'err') : p.leader}</td>
+              <td class="mono small">${p.replicas.join(', ')}</td>
+              <td>${p.isr.length < p.replicas.length
+                ? `<span class="mono small" style="color:var(--warn)">${p.isr.join(', ')}</span>`
+                : `<span class="mono small muted">${p.isr.join(', ')}</span>`}</td>
+              <td class="num">${fmtNum(p.beginningOffset)}</td>
+              <td class="num">${fmtNum(p.endOffset)}</td>
+              <td class="num">${fmtNum(p.messageCount)}</td>
             </tr>`).join('')}
         </tbody>
       </table></div>
     </div>
 
     <div class="card">
-      <div class="card-title"><h2>Partition history</h2>
-        <span class="faint small">sampled every 15s · ${history && history.monitored
-          ? `since ${fmtRel(history.firstSeen)} · ${history.total ?? (history.events || []).length} change(s)`
-          : 'waiting for first sample'}</span></div>
-      ${(history?.events || []).length === 0 ? `
-        <div class="empty-state">No changes observed yet — leaders/ISR are stable since monitoring started.
-        Events appear here automatically when a leader moves (election, broker restart, reassignment) or the ISR changes.</div>`
-      : `<div class="table-wrap" style="max-height:380px; overflow-y:auto"><table class="tbl">
-          <thead><tr><th>When</th><th>Event</th><th class="num">Partition</th><th>Change</th></tr></thead>
+      <div class="card-title"><h2>Replica placement</h2>
+        <div class="btn-row">
+          <button class="btn ghost sm" id="rp-flow-btn">Flow view</button>
+          <button class="btn ghost sm" id="rp-matrix-btn">Matrix view</button>
+        </div>
+      </div>
+      <p class="muted small" style="margin:0 0 12px">
+        Producers write to the partition <b>leader</b> (orange). Followers on other brokers copy every
+        message — the copies that stay caught-up form the <b>ISR</b> (in-sync replicas, teal). If a leader
+        dies, one of its in-sync followers is promoted. Click any partition card to see its history.
+      </p>
+      <div id="rp-flow" class="pcards">
+        ${detail.partitions.map((p) => partitionFlowCard(p, brokers)).join('')}
+      </div>
+      <div id="rp-matrix" style="display:none">
+        <div class="table-wrap"><table class="tbl matrix">
+          <thead><tr><th>Broker</th>${detail.partitions.map((p) => `<th class="num" data-matrix-partition="${p.partition}" title="Show p${p.partition} history" style="cursor:pointer">p${p.partition}</th>`).join('')}</tr></thead>
           <tbody>
-            ${(history.events || []).map((e) => `
+            ${brokers.map((b) => `
               <tr>
-                <td class="small muted">${fmtRel(e.ts)}</td>
-                <td>${eventBadge(e.type)}</td>
-                <td class="mono">${esc(e.topic)} · p${e.partition}</td>
-                <td class="small">${esc(e.detail || '')}${e.fromLeader !== null && e.fromLeader !== undefined && e.type.startsWith('LEADER')
-                  ? ` <span class="mono muted">broker ${e.fromLeader}${e.toLeader != null ? ' → ' + e.toLeader : ''}</span>` : ''}</td>
+                <td class="mono">${b.id < 0 ? badge('offline', 'err') : `broker ${b.id}`} <span class="faint small">${esc(b.host)}:${esc(b.port)}</span></td>
+                ${detail.partitions.map((p) => {
+                  const cell = roleCell(b.id, p);
+                  return `<td class="num"><span class="role-cell ${cell.cls}">${cell.label}</span></td>`;
+                }).join('')}
               </tr>`).join('')}
           </tbody>
-        </table></div>`}
+        </table></div>
+      </div>
+    </div>
+
+    <div class="card" id="history-card">
+      <div class="card-title"><h2>Partition history</h2>
+        <div class="btn-row">
+          <select id="hist-partition" style="width:auto" title="Filter history by partition">
+            <option value="">All partitions</option>
+            ${detail.partitions.map((p) => `<option value="${p.partition}">p${p.partition}</option>`).join('')}
+          </select>
+          <span class="faint small">sampled every 15s · ${history && history.monitored
+            ? `since ${fmtRel(history.firstSeen)}`
+            : 'waiting for first sample'}</span>
+        </div>
+      </div>
+      <div id="hist-body"></div>
     </div>
 
     <div class="card">
@@ -218,6 +248,44 @@ export async function renderTopicDetail(view, topic) {
         <tbody id="config-rows">${configRows(detail.configs, '')}</tbody>
       </table></div>
     </div>`;
+
+  // ---- partition history interactions ----
+  const histBody = view.querySelector('#hist-body');
+  const histSelect = view.querySelector('#hist-partition');
+
+  function renderHistoryBody() {
+    const events = historyEvents.filter((e) => historyFilter === '' || e.partition === historyFilter);
+    const countLine = `<div class="small muted mb16">${events.length} change(s)${historyFilter !== '' ? ` on p${historyFilter}` : ' across all partitions'}</div>`;
+    if (events.length === 0) {
+      histBody.innerHTML = countLine + `<div class="empty-state">${historyFilter === ''
+        ? 'No changes observed yet — leaders/ISR are stable since monitoring started. New elections, broker restarts or ISR churn appear here automatically.'
+        : 'No recorded changes for p' + esc(historyFilter) + ' — it has been stable since monitoring started.'}</div>`;
+      return;
+    }
+    histBody.innerHTML = countLine + `<div class="timeline">${events.map(timelineItem).join('')}</div>`;
+  }
+
+  function setHistoryFilter(p, scroll) {
+    historyFilter = p;
+    if (histSelect) histSelect.value = String(p);
+    renderHistoryBody();
+    if (scroll) {
+      const card = document.getElementById('history-card');
+      card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  histSelect.addEventListener('change', () => {
+    historyFilter = histSelect.value === '' ? '' : Number(histSelect.value);
+    renderHistoryBody();
+  });
+  view.querySelectorAll('#partitions-tbody tr').forEach((tr) => {
+    tr.addEventListener('click', () => setHistoryFilter(Number(tr.dataset.partition), true));
+  });
+  view.querySelectorAll('th[data-matrix-partition]').forEach((th) => {
+    th.addEventListener('click', () => setHistoryFilter(Number(th.dataset.matrixPartition), true));
+  });
+  renderHistoryBody();
 
   const search = view.querySelector('#config-search');
   const tbody = view.querySelector('#config-rows');
@@ -288,6 +356,42 @@ export async function renderTopicDetail(view, topic) {
 }
 
 
+function partitionFlowCard(p, brokers) {
+  const healthy = p.isr.length === p.replicas.length && p.leader >= 0;
+  const leaderBroker = brokers.find((b) => b.id === p.leader);
+  const followers = p.replicas.filter((r) => r !== p.leader);
+  const followerChip = (id) => {
+    const inSync = p.isr.includes(id);
+    const b = brokers.find((x) => x.id === id);
+    const host = b ? `<span class="faint small"> ${esc(b.host)}:${esc(b.port)}</span>` : '';
+    return `<div class="flow-row ${inSync ? 'f-in' : 'f-oos'}">
+      <span class="flow-arrow">↳ replicate ▸</span>
+      <span class="broker-chip ${inSync ? 'chip-in' : 'chip-oos'}"><span class="role-tag">F</span> broker ${id}</span>${host}
+      <span class="small muted" style="margin-left:auto">${inSync ? 'in-sync' : 'out of sync'}</span>
+    </div>`;
+  };
+  return `
+    <div class="pcard ${healthy ? '' : 'pcard-bad'}" data-p="${p.partition}">
+      <div class="pcard-head">
+        <span class="mono pcard-title">p${p.partition}</span>
+        <span class="pcard-rf">RF ${p.replicas.length}</span>
+        ${healthy ? badge('healthy', 'ok') : badge('under-replicated', 'err')}
+      </div>
+      <div class="pcard-body">
+        <div class="flow-row">
+          <span class="broker-chip chip-leader"><span class="role-tag">L</span> broker ${p.leader}</span>
+          ${leaderBroker ? `<span class="faint small">${esc(leaderBroker.host)}:${esc(leaderBroker.port)}</span>` : ''}
+          <span class="small muted" style="margin-left:auto">leader — all writes land here</span>
+        </div>
+        ${followers.map(followerChip).join('')}
+      </div>
+      <div class="pcard-foot small muted">
+        offsets ${fmtNum(p.beginningOffset)} → ${fmtNum(p.endOffset)} · ${fmtNum(p.messageCount)} messages
+        <button class="btn ghost sm pcard-hist" data-p="${p.partition}" style="float:right">history ↗</button>
+      </div>
+    </div>`;
+}
+
 function roleCell(brokerId, p) {
   if (p.leader === brokerId) return { cls: 'cell-leader', label: 'L' };
   if (p.replicas.includes(brokerId)) {
@@ -296,6 +400,18 @@ function roleCell(brokerId, p) {
       : { cls: 'cell-oor', label: 'F*' };
   }
   return { cls: 'cell-none', label: '·' };
+}
+
+function timelineItem(e) {
+  const cls = { LEADER_OFFLINE: 'tl-offline', ISR_CHANGED: 'tl-isr', REASSIGNED: 'tl-reassigned' }[e.type] || '';
+  const leaderMove = e.type.startsWith('LEADER') && e.fromLeader !== null && e.fromLeader !== undefined;
+  return `
+    <div class="tl-item ${cls}">
+      <div class="tl-head">${eventBadge(e.type)} <span class="mono small muted">p${e.partition}</span>
+        <span class="small muted" style="margin-left:auto">${fmtRel(e.ts)}</span></div>
+      <div class="small">${esc(e.detail || '')}</div>
+      ${leaderMove ? `<div class="mono small muted">broker ${e.fromLeader}${e.toLeader != null ? ' → ' + e.toLeader : ' (offline)'}</div>` : ''}
+    </div>`;
 }
 
 function eventBadge(type) {
