@@ -1,7 +1,7 @@
 // ===== Topics: list + full topic detail (partitions, configs, lifecycle) =====
 import { get, post, put, del, clusterPath } from '../api.js';
 import {
-  esc, fmtNum, fmtCompact, badge, skeletonTable, toast, confirmDialog, modal, debounce, makeSortable,
+  esc, fmtNum, fmtCompact, badge, skeletonTable, toast, confirmDialog, modal, debounce, makeSortable, fmtRel,
 } from '../ui.js';
 
 export async function renderTopics(view) {
@@ -141,7 +141,11 @@ function createTopicModal(done) {
 
 export async function renderTopicDetail(view, topic) {
   view.innerHTML = `<div class="toolbar" style="align-items:center"><h1 class="mono" style="margin:0">${esc(topic)}</h1></div>${skeletonTable(8, 5)}`;
-  const detail = await get(clusterPath() + `/topics/${encodeURIComponent(topic)}`);
+  const [detail, brokers, history] = await Promise.all([
+    get(clusterPath() + `/topics/${encodeURIComponent(topic)}`),
+    get(clusterPath() + '/brokers').catch(() => []),
+    get(clusterPath() + `/topics/${encodeURIComponent(topic)}/history?limit=100`).catch(() => null),
+  ]);
   const totalMessages = detail.partitions.reduce((sum, p) => sum + p.messageCount, 0);
 
   view.innerHTML = `
@@ -166,24 +170,44 @@ export async function renderTopicDetail(view, topic) {
     </div>
 
     <div class="card">
-      <div class="card-title"><h2>Partitions</h2></div>
-      <div class="table-wrap"><table class="tbl">
-        <thead><tr><th>Partition</th><th class="num">Leader</th><th>Replicas</th><th>ISR</th><th class="num">Beginning</th><th class="num">End</th><th class="num">Messages</th></tr></thead>
+      <div class="card-title"><h2>Replica placement</h2>
+        <span class="faint small">which broker holds what — L leader · F in-sync follower · F* out of sync</span></div>
+      <div class="table-wrap"><table class="tbl matrix">
+        <thead><tr><th>Broker</th>${detail.partitions.map((p) => `<th class="num">p${p.partition}</th>`).join('')}</tr></thead>
         <tbody>
-          ${detail.partitions.map((p) => `
+          ${brokers.map((b) => `
             <tr>
-              <td class="mono">${p.partition}</td>
-              <td class="num">${p.leader < 0 ? badge('none', 'err') : p.leader}</td>
-              <td class="mono small">${p.replicas.join(', ')}</td>
-              <td>${p.isr.length < p.replicas.length
-                ? `<span class="mono small" style="color:var(--warn)">${p.isr.join(', ')}</span>`
-                : `<span class="mono small muted">${p.isr.join(', ')}</span>`}</td>
-              <td class="num">${fmtNum(p.beginningOffset)}</td>
-              <td class="num">${fmtNum(p.endOffset)}</td>
-              <td class="num">${fmtNum(p.messageCount)}</td>
+              <td class="mono">${b.id < 0 ? badge('offline', 'err') : `broker ${b.id}`} <span class="faint small">${esc(b.host)}:${esc(b.port)}</span></td>
+              ${detail.partitions.map((p) => {
+                const cell = roleCell(b.id, p);
+                return `<td class="num"><span class="role-cell ${cell.cls}">${cell.label}</span></td>`;
+              }).join('')}
             </tr>`).join('')}
         </tbody>
       </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><h2>Partition history</h2>
+        <span class="faint small">sampled every 15s · ${history && history.monitored
+          ? `since ${fmtRel(history.firstSeen)} · ${history.total ?? (history.events || []).length} change(s)`
+          : 'waiting for first sample'}</span></div>
+      ${(history?.events || []).length === 0 ? `
+        <div class="empty-state">No changes observed yet — leaders/ISR are stable since monitoring started.
+        Events appear here automatically when a leader moves (election, broker restart, reassignment) or the ISR changes.</div>`
+      : `<div class="table-wrap" style="max-height:380px; overflow-y:auto"><table class="tbl">
+          <thead><tr><th>When</th><th>Event</th><th class="num">Partition</th><th>Change</th></tr></thead>
+          <tbody>
+            ${(history.events || []).map((e) => `
+              <tr>
+                <td class="small muted">${fmtRel(e.ts)}</td>
+                <td>${eventBadge(e.type)}</td>
+                <td class="mono">${esc(e.topic)} · p${e.partition}</td>
+                <td class="small">${esc(e.detail || '')}${e.fromLeader !== null && e.fromLeader !== undefined && e.type.startsWith('LEADER')
+                  ? ` <span class="mono muted">broker ${e.fromLeader}${e.toLeader != null ? ' → ' + e.toLeader : ''}</span>` : ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table></div>`}
     </div>
 
     <div class="card">
@@ -200,6 +224,9 @@ export async function renderTopicDetail(view, topic) {
   search.addEventListener('input', debounce(() => {
     tbody.innerHTML = configRows(detail.configs, search.value);
   }, 150));
+
+  const historyCard = view.querySelector('.card-title .faint.small');
+  const refreshHistory = debounce(() => renderTopicDetail(view, topic), 400);
 
   view.querySelector('#delete-btn').addEventListener('click', () => {
     confirmDelete(detail.name, () => { location.hash = '#/topics'; });
@@ -260,8 +287,31 @@ export async function renderTopicDetail(view, topic) {
   });
 }
 
-function configRows(configs, filter) {
-  const f = filter.toLowerCase();
+
+function roleCell(brokerId, p) {
+  if (p.leader === brokerId) return { cls: 'cell-leader', label: 'L' };
+  if (p.replicas.includes(brokerId)) {
+    return p.isr.includes(brokerId)
+      ? { cls: 'cell-follower', label: 'F' }
+      : { cls: 'cell-oor', label: 'F*' };
+  }
+  return { cls: 'cell-none', label: '·' };
+}
+
+function eventBadge(type) {
+  const map = {
+    LEADER_CHANGED: ['leader changed', 'accent'],
+    LEADER_OFFLINE: ['leader offline', 'err'],
+    ISR_CHANGED: ['ISR changed', 'warn'],
+    REASSIGNED: ['reassigned', 'cyan'],
+    PARTITION_ADDED: ['partition added', 'ok'],
+    PARTITION_REMOVED: ['partition removed', 'neutral'],
+  };
+  const [label, tone] = map[type] || [type, 'neutral'];
+  return badge(label, tone);
+}
+
+function configRows(configs, filter) {  const f = filter.toLowerCase();
   return configs
     .filter((c) => c.name.toLowerCase().includes(f))
     .map((c) => `
