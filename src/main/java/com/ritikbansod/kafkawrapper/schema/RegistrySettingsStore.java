@@ -28,7 +28,7 @@ public class RegistrySettingsStore {
     private final ObjectMapper mapper;
     private final Map<String, SchemaRegistrySettings> byCluster = new LinkedHashMap<>();
 
-    public RegistrySettingsStore(@Value("${kafka-wrapper.data-dir:./data}") String dataDir,
+    public RegistrySettingsStore(@Value("${kview.data-dir:./data}") String dataDir,
                                  ObjectMapper mapper) {
         this.file = Path.of(dataDir, "registries.json");
         this.mapper = mapper;
