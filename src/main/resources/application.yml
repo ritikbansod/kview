@@ -19,6 +19,9 @@ server:
 kview:
   # Connection profiles are persisted under this directory
   data-dir: ${KVIEW_DATA_DIR:./data}
+  # Partition leader/ISR history sampler (per cluster)
+  partition-history:
+    interval-ms: ${KVIEW_HISTORY_INTERVAL_MS:15000}
 
 management:
   endpoints:
