@@ -22,6 +22,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import java.io.ByteArrayOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,9 @@ class SchemaDecodeIntegrationTest {
     @Autowired
     SchemaRegistryService registryService;
 
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
     private static final String SCHEMA_JSON = """
             {"type":"record","name":"Order","fields":[
               {"name":"orderId","type":"string"},
@@ -69,6 +73,15 @@ class SchemaDecodeIntegrationTest {
         fakeRegistry.createContext("/schemas/ids/1", exchange -> {
             byte[] body = ("{\"schemaType\":\"AVRO\",\"schema\":" +
                     com.fasterxml.jackson.databind.node.TextNode.valueOf(SCHEMA_JSON).toString() + "}")
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/vnd.schemaregistry.v1+json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        fakeRegistry.createContext("/subjects/sr-orders-value/versions/latest", exchange -> {
+            byte[] body = ("{\"subject\":\"sr-orders-value\",\"version\":1,\"id\":1,\"schemaType\":\"AVRO\"," +
+                    "\"schema\":" + com.fasterxml.jackson.databind.node.TextNode.valueOf(SCHEMA_JSON).toString() + "}")
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/vnd.schemaregistry.v1+json");
             exchange.sendResponseHeaders(200, body.length);
@@ -138,6 +151,36 @@ class SchemaDecodeIntegrationTest {
         var decoded = registryService.decode(KafkaClusterManager.DEFAULT_CLUSTER_ID,
                 java.util.Base64.getDecoder().decode(message.valueBase64()), TOPIC, false);
         assertThat(decoded.decoded().get("amount").asDouble()).isEqualTo(91.5);
+    }
+
+    @Test
+    void encodeProducesWireBytesThatDecodeBack() throws Exception {
+        var payload = mapper.valueToTree(Map.of("orderId", "ENC-1", "amount", 55.25));
+        var encoded = registryService.encode(KafkaClusterManager.DEFAULT_CLUSTER_ID,
+                "sr-orders-value", null, payload, false, false);
+
+        assertThat(encoded.schemaId()).isEqualTo(1);
+        assertThat(encoded.valueBase64()).isNotBlank();
+
+        var handle = clusterManager.get(KafkaClusterManager.DEFAULT_CLUSTER_ID);
+        handle.template().send(new org.apache.kafka.clients.producer.ProducerRecord<>(
+                TOPIC, "enc-1".getBytes(), java.util.Base64.getDecoder().decode(encoded.valueBase64()))).get();
+
+        var result = browserService.browse(handle, TOPIC,
+                new MessageBrowserService.BrowseRequest(
+                        null, "earliest", null, null, 10, 10_000L, "enc-1", null));
+        assertThat(result.messages()).hasSize(1);
+        assertThat(result.messages().get(0).schema().decoded().get("orderId").asText()).isEqualTo("ENC-1");
+        assertThat(result.messages().get(0).schema().decoded().get("amount").asDouble()).isEqualTo(55.25);
+    }
+
+    @Test
+    void encodeRejectsPayloadViolatingSchema() {
+        var payload = mapper.valueToTree(Map.of("amount", "not-a-number"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                registryService.encode(KafkaClusterManager.DEFAULT_CLUSTER_ID,
+                        "sr-orders-value", null, payload, false, false))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
