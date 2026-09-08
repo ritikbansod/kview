@@ -377,10 +377,25 @@ function renderTail(panel, topicSelect, getPartitions) {
 
 // ---------------- Produce ----------------
 
-function renderProduce(panel, topicSelect) {
+async function renderProduce(panel, topicSelect) {
+  const registry = await get(clusterPath() + '/registry').catch(() => null);
   panel.innerHTML = `
     <div class="two-col">
       <div class="card">
+        ${registry ? `
+        <fieldset class="section mb16"><legend>Schema registry attached</legend>
+          <div class="form-grid">
+            <div class="field"><label>Subject</label>
+              <select id="pr-subject"></select></div>
+            <div class="field"><label>Version</label>
+              <select id="pr-version"><option value="">latest</option></select></div>
+          </div>
+          <div class="btn-row mb16">
+            <button class="btn ghost sm" id="pr-sample">Generate sample</button>
+            <button class="btn ghost sm" id="pr-validate">Validate payload</button>
+          </div>
+          <div id="pr-schema-status" class="small"></div>
+        </fieldset>` : ''}
         <div class="field"><label>Key <span class="hint">(optional — null keys round-robin)</span></label>
           <input type="text" id="pr-key" placeholder="e.g. order-123" /></div>
         <div class="field"><label>Partition <span class="hint">(optional)</span></label>
@@ -419,6 +434,66 @@ function renderProduce(panel, topicSelect) {
 
   const valueBox = panel.querySelector('#pr-value');
   const history = [];
+  let schemaMode = false;
+  let subjects = [];
+
+  if (registry) {
+    try {
+      subjects = (await get(clusterPath() + '/registry/subjects')) || [];
+    } catch { subjects = []; }
+    const subjectSel = panel.querySelector('#pr-subject');
+    const versionSel = panel.querySelector('#pr-version');
+    const topic = topicSelect.value;
+    const preferred = [`${topic}-value`, `${topic}-key`];
+    const ordered = [...subjects.filter(s2 => preferred.includes(s2)), ...subjects.filter(s2 => !preferred.includes(s2))];
+    subjectSel.innerHTML = ordered.map(s2 => `<option value="${esc(s2)}">${esc(s2)}</option>`).join('');
+    subjectSel.addEventListener('change', loadVersions);
+    await loadVersions();
+
+    async function loadVersions() {
+      const subject = subjectSel.value;
+      versionSel.innerHTML = '<option value="">latest</option>';
+      if (!subject) return;
+      try {
+        const versions = await get(clusterPath() + '/registry/subjects/' + encodeURIComponent(subject) + '/versions');
+        versionSel.innerHTML += (versions || []).map(v =>
+          `<option value="${v}">${v}</option>`).join('');
+      } catch { /* keep latest only */ }
+    }
+
+    panel.querySelector('#pr-sample').addEventListener('click', async () => {
+      const subject = subjectSel.value;
+      if (!subject) { toast('Pick a subject first', 'warn'); return; }
+      try {
+        const version = versionSel.value === '' ? null : Number(versionSel.value);
+        const sample = await get(clusterPath() + '/registry/subjects/' + encodeURIComponent(subject)
+          + '/sample' + (version ? '?version=' + version : ''));
+        valueBox.value = JSON.stringify(sample, null, 2);
+        setStatus('#pr-schema-status', 'Sample generated from ' + subject + (version ? ' v' + version : ' latest'), '');
+      } catch (err) { setStatus('#pr-schema-status', err.message, 'err'); }
+    });
+
+    panel.querySelector('#pr-validate').addEventListener('click', async () => {
+      const subject = subjectSel.value;
+      if (!subject) { toast('Pick a subject first', 'warn'); return; }
+      await encodePayload(subject, versionSel, true);
+    });
+  }
+
+  function setStatus(sel, text, cls) {
+    const el = panel.querySelector(sel);
+    if (el) el.innerHTML = cls ? `<span class="badge tone-${cls}">${esc(text)}</span>` : esc(text);
+  }
+
+  async function encodePayload(subject, versionSel, dryRun) {
+    let parsed;
+    try { parsed = JSON.parse(valueBox.value); }
+    catch (e) { throw new Error('Value must be valid JSON for schema encoding: ' + e.message); }
+    const version = versionSel && versionSel.value !== '' ? Number(versionSel.value) : null;
+    const res = await post(clusterPath() + '/registry/subjects/' + encodeURIComponent(subject) + '/encode'
+      + (version ? '?version=' + version : ''), { payload: parsed, version, dryRun });
+    return res;
+  }
   const send = async () => {
     const topic = topicSelect.value;
     const resultEl = panel.querySelector('#pr-result');
@@ -429,16 +504,24 @@ function renderProduce(panel, topicSelect) {
       catch { toast('Headers must be valid JSON', 'err'); return; }
     }
     const partition = panel.querySelector('#pr-partition').value;
+    const schemaSubject = panel.querySelector('#pr-subject')?.value || '';
     try {
+      let payloadB64 = null;
+      if (schemaSubject) {
+        const encoded = await encodePayload(schemaSubject, panel.querySelector('#pr-version'), false);
+        payloadB64 = encoded.valueBase64;
+      }
       const result = await post(clusterPath() + `/topics/${encodeURIComponent(topic)}/messages`, {
         key: panel.querySelector('#pr-key').value.trim() || null,
-        payload: valueBox.value,
+        payloadBase64: payloadB64,
+        payload: payloadB64 ? null : valueBox.value,
         partition: partition === '' ? null : Number(partition),
         headers,
       });
       resultEl.innerHTML = `
         <div class="test-result ok mono" style="color:var(--text)">
           ✓ stored in <b>partition ${result.partition}</b> at <b>offset ${result.offset}</b>
+          ${payloadB64 ? badge('schema-encoded', 'accent') : ''}
           <div class="muted small">timestamp ${fmtTs(result.timestamp)}</div>
         </div>`;
       history.unshift({ topic, partition: result.partition, offset: result.offset, key: panel.querySelector('#pr-key').value });
