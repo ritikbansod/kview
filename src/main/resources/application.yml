@@ -1,6 +1,11 @@
 spring:
   application:
     name: kview
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
