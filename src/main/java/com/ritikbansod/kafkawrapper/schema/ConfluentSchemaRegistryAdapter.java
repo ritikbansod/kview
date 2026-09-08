@@ -60,6 +60,11 @@ public class ConfluentSchemaRegistryAdapter implements SchemaRegistryAdapter {
         return getJson(settings, "/schemas/ids/" + id);
     }
 
+    /** Raw authenticated GET against any registry path (encode/compat plumbing). */
+    public JsonNode rawGet(SchemaRegistrySettings settings, String path) {
+        return getJson(settings, path);
+    }
+
     private JsonNode getJson(SchemaRegistrySettings settings, String path) {
         try {
             return mapper.readTree(get(settings, path));

@@ -2,17 +2,28 @@ package com.ritikbansod.kafkawrapper.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
+import org.apache.avro.LogicalType;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.EncoderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DecoderFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -49,12 +60,16 @@ public class SchemaRegistryService {
     private static final long AVRO_TTL_MS = 300_000;       // parsed Avro schemas
 
     private final List<SchemaRegistryAdapter> adapters;
+    private final ConfluentSchemaRegistryAdapter confluentAdapter;
     private final RegistrySettingsStore settingsStore;
     private final ObjectMapper mapper = new ObjectMapper();
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
-    public SchemaRegistryService(List<SchemaRegistryAdapter> adapters, RegistrySettingsStore settingsStore) {
+    public SchemaRegistryService(List<SchemaRegistryAdapter> adapters,
+                                 ConfluentSchemaRegistryAdapter confluentAdapter,
+                                 RegistrySettingsStore settingsStore) {
         this.adapters = adapters;
+        this.confluentAdapter = confluentAdapter;
         this.settingsStore = settingsStore;
     }
 
@@ -203,6 +218,189 @@ public class SchemaRegistryService {
             cache.put(key, new CacheEntry(value, System.currentTimeMillis() + ttlMs));
             return value;
         }
+    }
+
+    // ---------- encode pipeline (phase 2) ----------
+
+    public record EncodedPayload(String valueBase64, int schemaId, String subject, int version,
+                                 String schemaType, JsonNode normalized) { }
+
+    /**
+     * Encodes user JSON into the registry's wire format:
+     * AVRO → GenericRecord binary; JSON → validated UTF-8 text. Header: 0x00 + schema id.
+     * With {@code dryRun} nothing is returned for producing — the caller inspects the result.
+     */
+    public EncodedPayload encode(String clusterId, String subject, Integer version, JsonNode payload,
+                                 boolean isKey, boolean dryRun) {
+        SchemaRegistrySettings settings = requireSettings(clusterId);
+        JsonNode envelope = version == null
+                ? confluentAdapter.rawGet(settings, "/subjects/" + enc(subject) + "/versions/latest")
+                : adapterFor(settings).schemaVersion(settings, subject, version);
+        int id = envelope.path("id").asInt();
+        if (id <= 0) {
+            throw new IllegalArgumentException(
+                    "Schema envelope has no numeric id — this registry may not use Confluent wire ids");
+        }
+        String schemaType = envelope.path("schemaType").asText("AVRO");
+        String schemaJson = envelope.path("schema").asText();
+        int resolvedVersion = envelope.path("version").asInt(version == null ? -1 : version);
+
+        byte[] body;
+        JsonNode normalized;
+        switch (schemaType.toUpperCase()) {
+            case "AVRO" -> {
+                Schema schema = cached("avro:" + schemaJson.hashCode(), AVRO_TTL_MS, () -> {
+                    try {
+                        return new Schema.Parser().parse(schemaJson);
+                    } catch (RuntimeException e) {
+                        throw new IllegalArgumentException("Could not parse Avro schema: " + e.getMessage(), e);
+                    }
+                });
+                GenericRecord record = JsonToAvroConverter.fromJson(payload, schema);
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
+                try {
+                    new GenericDatumWriter<GenericRecord>(schema).write(record, encoder);
+                    encoder.flush();
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(
+                            "Payload does not match the Avro schema: " + rootMessage(e), e);
+                }
+                body = out.toByteArray();
+                normalized = AvroJsonConverter.toJson(record, schema);
+            }
+            case "JSON" -> {
+                try {
+                    JsonSchema jsonSchema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7)
+                            .getSchema(mapper.readTree(schemaJson));
+                    var violations = jsonSchema.validate(payload);
+                    if (!violations.isEmpty()) {
+                        throw new IllegalArgumentException("Payload violates the JSON schema: "
+                                + violations.stream().map(ValidationMessage::getMessage)
+                                .reduce((a, b) -> a + "; " + b).orElse(""));
+                    }
+                } catch (IllegalArgumentException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Could not validate against the JSON schema: " + e.getMessage(), e);
+                }
+                body = payload.toString().getBytes(StandardCharsets.UTF_8);
+                normalized = payload;
+            }
+            case "PROTO" -> throw new IllegalArgumentException(
+                    "Protobuf encoding arrives in phase 2b — not supported yet");
+            default -> throw new IllegalArgumentException("Unsupported schema type '" + schemaType + "'");
+        }
+
+        byte[] wire = new byte[5 + body.length];
+        wire[0] = 0x00;
+        wire[1] = (byte) (id >>> 24);
+        wire[2] = (byte) (id >>> 16);
+        wire[3] = (byte) (id >>> 8);
+        wire[4] = (byte) id;
+        System.arraycopy(body, 0, wire, 5, body.length);
+
+        return new EncodedPayload(java.util.Base64.getEncoder().encodeToString(wire),
+                id, subject, resolvedVersion, schemaType, normalized);
+    }
+
+    /** Generates a sample JSON payload from a schema (defaults where provided). */
+    public JsonNode sample(String clusterId, String subject, Integer version) {
+        SchemaRegistrySettings settings = requireSettings(clusterId);
+        JsonNode envelope = version == null
+                ? confluentAdapter.rawGet(settings, "/subjects/" + enc(subject) + "/versions/latest")
+                : adapterFor(settings).schemaVersion(settings, subject, version);
+        String schemaType = envelope.path("schemaType").asText("AVRO");
+        if (!"AVRO".equalsIgnoreCase(schemaType)) {
+            throw new IllegalArgumentException("Sample generation supports AVRO (got " + schemaType + ")");
+        }
+        Schema schema = new Schema.Parser().parse(envelope.path("schema").asText());
+        return sampleFor(schema, 0);
+    }
+
+    private JsonNode sampleFor(Schema schema, int depth) {
+        var factory = JsonNodeFactory.instance;
+        if (schema.isUnion()) {
+            for (Schema branch : schema.getTypes()) {
+                if (branch.getType() != Schema.Type.NULL) return sampleFor(branch, depth);
+            }
+            return factory.nullNode();
+        }
+        if (depth > 8) return factory.textNode("…");
+        if (schema.getObjectProp("default") != null && schema.getType() != Schema.Type.RECORD
+                && schema.getType() != Schema.Type.ARRAY && schema.getType() != Schema.Type.MAP) {
+            try {
+                return mapper.valueToTree(schema.getObjectProp("default"));
+            } catch (Exception ignored) {
+                // fall through to type-based sample
+            }
+        }
+        switch (schema.getType()) {
+            case STRING: {
+                LogicalType logical = schema.getLogicalType();
+                if (logical != null && "date".equals(logical.getName()))
+                    return factory.textNode(LocalDate.now().toString());
+                if (logical != null && ("timestamp-millis".equals(logical.getName())
+                        || "timestamp-micros".equals(logical.getName())))
+                    return factory.textNode(Instant.now().toString());
+                if (logical != null && "uuid".equals(logical.getName()))
+                    return factory.textNode(java.util.UUID.randomUUID().toString());
+                return factory.textNode("sample");
+            }
+            case INT: {
+                LogicalType logical = schema.getLogicalType();
+                if (logical != null && "date".equals(logical.getName()))
+                    return factory.numberNode((int) LocalDate.now().toEpochDay());
+                return factory.numberNode(1);
+            }
+            case LONG: {
+                LogicalType logical = schema.getLogicalType();
+                if (logical != null && ("timestamp-millis".equals(logical.getName())
+                        || "timestamp-micros".equals(logical.getName())))
+                    return factory.numberNode(System.currentTimeMillis());
+                return factory.numberNode(1L);
+            }
+            case DOUBLE: return factory.numberNode(1.0d);
+            case FLOAT: return factory.numberNode(1.0f);
+            case BOOLEAN: return factory.booleanNode(true);
+            case ENUM: return factory.textNode(schema.getEnumSymbols().get(0));
+            case ARRAY: {
+                var node = factory.arrayNode();
+                node.add(sampleFor(schema.getElementType(), depth + 1));
+                return node;
+            }
+            case MAP: {
+                var node = factory.objectNode();
+                node.set("key1", sampleFor(schema.getValueType(), depth + 1));
+                return node;
+            }
+            case RECORD: {
+                var node = factory.objectNode();
+                for (Schema.Field field : schema.getFields()) {
+                    node.set(field.name(), sampleFor(field.schema(), depth + 1));
+                }
+                return node;
+            }
+            case BYTES: return factory.textNode("sample");
+            case FIXED: return factory.textNode("sample");
+            case NULL: return factory.nullNode();
+            default: return factory.textNode("sample");
+        }
+    }
+
+    private String enc(String subject) {
+        return java.net.URLEncoder.encode(subject, StandardCharsets.UTF_8);
+    }
+
+    private SchemaRegistrySettings requireSettings(String clusterId) {
+        return settingsFor(clusterId).orElseThrow(() ->
+                new IllegalArgumentException("No schema registry attached to cluster '" + clusterId + "'"));
+    }
+
+    private static String rootMessage(Throwable e) {
+        Throwable t = e;
+        while (t.getCause() != null) t = t.getCause();
+        return t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
     }
 
     /** Content of a schema version as raw JSON text (for the upcoming Schemas page). */

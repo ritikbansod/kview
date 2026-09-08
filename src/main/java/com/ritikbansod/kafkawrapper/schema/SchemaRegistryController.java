@@ -1,6 +1,7 @@
 package com.ritikbansod.kafkawrapper.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
@@ -94,5 +95,37 @@ public class SchemaRegistryController {
         SchemaRegistryService.DecodedPayload payload =
                 registryService.decode(clusterId, bytes, request.topic(), request.key());
         return ResponseEntity.status(HttpStatus.OK).body(payload);
+    }
+
+    // ---- encode (produce path) ----
+
+    /** Encodes a JSON payload with the subject's schema into registry wire bytes. */
+    @PostMapping("/api/clusters/{clusterId}/registry/subjects/{subject}/encode")
+    public Map<String, Object> encode(@PathVariable String clusterId, @PathVariable String subject,
+                                      @RequestParam(defaultValue = "false") boolean key,
+                                      @Valid @RequestBody EncodeRequestHolder request) {
+        if (request.payload() == null || request.payload().isNull()) {
+            throw new IllegalArgumentException("payload is required");
+        }
+        SchemaRegistryService.EncodedPayload encoded = registryService.encode(clusterId, subject,
+                request.version(), request.payload(), key, Boolean.TRUE.equals(request.dryRun()));
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("valueBase64", encoded.valueBase64());
+        body.put("schemaId", encoded.schemaId());
+        body.put("subject", encoded.subject());
+        body.put("version", encoded.version());
+        body.put("schemaType", encoded.schemaType());
+        body.put("normalized", encoded.normalized());
+        body.put("dryRun", Boolean.TRUE.equals(request.dryRun()));
+        return body;
+    }
+
+    public record EncodeRequestHolder(JsonNode payload, Integer version, Boolean dryRun) { }
+
+    /** Generates a sample JSON payload from the subject's schema. */
+    @GetMapping("/api/clusters/{clusterId}/registry/subjects/{subject}/sample")
+    public JsonNode sample(@PathVariable String clusterId, @PathVariable String subject,
+                           @RequestParam(required = false) Integer version) {
+        return registryService.sample(clusterId, subject, version);
     }
 }
