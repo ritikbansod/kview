@@ -1,4 +1,4 @@
-// ===== Dashboard: cluster KPIs, brokers (+configs), top topics, ACLs, auto-refresh =====
+// ===== Dashboard: cluster KPIs, brokers (+configs), partition distribution, top topics, ACLs =====
 import { get, clusterPath } from '../api.js';
 import { esc, fmtNum, fmtCompact, fmtRel, badge, skeletonTable, modal, debounce } from '../ui.js';
 
@@ -12,7 +12,7 @@ export async function renderDashboard(view) {
       <h1 style="margin:0">Cluster overview</h1>
       <div class="spacer" style="flex:1"></div>
       <label class="checkbox small"><input type="checkbox" id="auto-refresh" /> auto-refresh (10s)</label>
-      <span class="faint small" id="updated-at"></span>
+      <span class="faint small" id="updated-at">updated ${fmtRel(Date.now())}</span>
     </div>
     <div class="grid-kpi">
       ${Array.from({ length: 7 }, () => '<div class="kpi"><div class="label">&nbsp;</div><div class="skeleton" style="height:24px"></div></div>').join('')}
@@ -23,10 +23,11 @@ export async function renderDashboard(view) {
 }
 
 async function load(view) {
-  const [overview, topics, acls] = await Promise.all([
+  const [overview, topics, acls, distribution] = await Promise.all([
     get(clusterPath() + '/overview'),
     get(clusterPath() + '/topics?includeCounts=true'),
     get(clusterPath() + '/acls').catch(() => null),
+    get(clusterPath() + '/broker-distribution').catch(() => null),
   ]);
 
   const offline = overview.offlinePartitions ?? 0;
@@ -54,6 +55,13 @@ async function load(view) {
       <div class="kpi clickable" data-goto="#/groups"><div class="label">Consumer groups</div><div class="value">${fmtNum(overview.consumerGroupCount < 0 ? '—' : overview.consumerGroupCount)}</div></div>
       <div class="kpi clickable ${urp > 0 ? 'warn' : 'ok'}" data-goto="#/topics"><div class="label">Under-replicated</div><div class="value">${fmtNum(urp)}</div></div>
       <div class="kpi clickable ${offline > 0 ? 'err' : 'ok'}" data-goto="#/topics"><div class="label">Offline partitions</div><div class="value">${fmtNum(offline)}</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title"><h2>Partition distribution across brokers</h2>
+        <span class="badge ${distribution?.balanced ? 'tone-ok' : 'tone-warn'}">${distribution?.balanced ? 'balanced' : 'skewed'}</span>
+      </div>
+      ${renderDistribution(distribution)}
     </div>
 
     <div class="two-col">
@@ -104,11 +112,9 @@ async function load(view) {
     tr.addEventListener('click', () => brokerConfigsModal(Number(tr.dataset.broker)));
   });
 
-  // clickable KPI cards route to their pages
   view.querySelectorAll('.kpi[data-goto]').forEach((card) => {
     card.addEventListener('click', () => { location.hash = card.dataset.goto; });
   });
-  // brokers card scrolls to the broker table on the same page
   view.querySelectorAll('.kpi[data-scroll]').forEach((card) => {
     card.addEventListener('click', () => {
       document.querySelector('[data-broker-table]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -116,6 +122,48 @@ async function load(view) {
   });
 
   wireAutoRefresh(view);
+}
+
+function renderDistribution(distribution) {
+  if (!distribution) return '<div class="empty-state">Not loaded</div>';
+  const brokers = distribution.brokers || [];
+  if (brokers.length === 0) return '<div class="empty-state">No brokers</div>';
+
+  const maxPartitions = Math.max(1, ...brokers.map((b) => b.totalPartitions || 0));
+
+  return `
+    <div class="dist-grid">
+      ${brokers.map((b) => {
+        const leaderPct = b.totalPartitions > 0 ? Math.round((b.leaderCount / b.totalPartitions) * 100) : 0;
+        const followerPct = b.totalPartitions > 0 ? 100 - leaderPct : 0;
+        return `
+          <div class="dist-broker">
+            <div class="dist-head">
+              <span class="mono fw-bold">broker ${b.id}</span>
+              <span class="faint small">${esc(b.host)}:${esc(b.port)}</span>
+            </div>
+            <div class="dist-bar">
+              <div class="dist-leader" style="width:${leaderPct}%" title="${b.leaderCount} leader partitions">
+                <span class="dist-label">${b.leaderCount} L</span>
+              </div>
+              <div class="dist-follower" style="width:${followerPct}%" title="${b.followerCount} follower partitions">
+                <span class="dist-label">${b.followerCount} F</span>
+              </div>
+            </div>
+            <div class="dist-nums">
+              <span class="badge tone-accent">${b.leaderCount} leader</span>
+              <span class="badge tone-cyan">${b.followerCount} follower</span>
+              <span class="badge tone-neutral">${b.totalPartitions} total</span>
+              ${b.underReplicated > 0 ? `<span class="badge tone-err">${b.underReplicated} URP</span>` : ''}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+    <div class="dist-legend small faint" style="margin-top:10px">
+      <span style="color:var(--accent)">■</span> leader partitions &nbsp;&nbsp;
+      <span style="color:var(--cyan)">■</span> follower partitions &nbsp;&nbsp;
+      Total replicas: ${distribution.total?.totalReplicas ?? '—'}
+    </div>`;
 }
 
 function wireAutoRefresh(view) {

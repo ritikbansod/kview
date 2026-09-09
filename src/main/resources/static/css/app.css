@@ -443,6 +443,18 @@ fieldset.section legend { font-size: 12px; color: var(--accent); font-weight: 65
 .collapsible.collapsed .chev { transform: rotate(-90deg); }
 .collapsible.collapsed .collapsible-body { display: none; }
 
+/* ===== Partition distribution ===== */
+.dist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.dist-broker { background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 12px 14px; }
+.dist-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.fw-bold { font-weight: 700; }
+.dist-bar { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin-bottom: 8px; background: var(--panel-2); }
+.dist-leader { background: var(--accent); display: flex; align-items: center; justify-content: center; min-width: 0; }
+.dist-follower { background: var(--cyan); display: flex; align-items: center; justify-content: center; min-width: 0; }
+.dist-label { font-size: 11px; font-weight: 700; color: var(--accent-contrast); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+.dist-follower .dist-label { color: #06222b; }
+.dist-nums { display: flex; gap: 6px; flex-wrap: wrap; }
+
 /* ===== Replica flow cards ===== */
 .pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .pcard { background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: border-color .12s; }

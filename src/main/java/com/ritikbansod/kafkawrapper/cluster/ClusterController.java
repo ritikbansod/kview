@@ -46,6 +46,12 @@ public class ClusterController {
         return clusterService.brokerConfigs(manager.get(clusterId), brokerId);
     }
 
+    @GetMapping("/broker-distribution")
+    public Map<String, Object> brokerDistribution(@PathVariable String clusterId)
+            throws ExecutionException, InterruptedException {
+        return clusterService.brokerDistribution(manager.get(clusterId));
+    }
+
     @GetMapping("/acls")
     public Map<String, Object> acls(@PathVariable String clusterId) {
         return clusterService.acls(manager.get(clusterId));

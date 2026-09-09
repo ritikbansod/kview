@@ -114,6 +114,107 @@ public class ClusterService {
         return nodeViews(nodes);
     }
 
+    /**
+     * Per-broker partition distribution: how many partitions each broker hosts
+     * as leader vs follower, plus under-replicated counts and skew detection.
+     */
+    public Map<String, Object> brokerDistribution(ClusterHandle handle) throws ExecutionException, InterruptedException {
+        var admin = handle.admin();
+        DescribeClusterResult describe = admin.describeCluster(new DescribeClusterOptions().timeoutMs(TIMEOUT_MS));
+        Collection<Node> nodes = describe.nodes().get();
+        Set<String> topicNames = admin.listTopics(new ListTopicsOptions().timeoutMs(TIMEOUT_MS).listInternal(true))
+                .names().get();
+        Map<String, TopicDescription> descriptions = admin.describeTopics(topicNames)
+                .allTopicNames().get();
+
+        // init per-broker counters
+        Map<Integer, Map<String, Object>> brokerStats = new LinkedHashMap<>();
+        for (Node node : nodes) {
+            Map<String, Object> stats = new LinkedHashMap<>();
+            stats.put("id", node.id());
+            stats.put("host", node.host());
+            stats.put("port", node.port());
+            stats.put("leaderCount", 0);
+            stats.put("followerCount", 0);
+            stats.put("totalPartitions", 0);
+            stats.put("underReplicated", 0);
+            brokerStats.put(node.id(), stats);
+        }
+
+        int totalLeaders = 0;
+        int totalReplicas = 0;
+        for (TopicDescription td : descriptions.values()) {
+            for (TopicPartitionInfo p : td.partitions()) {
+                totalReplicas += p.replicas().size();
+                if (p.leader() != null) {
+                    brokerStats.computeIfAbsent(p.leader().id(), k -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", k);
+                        m.put("leaderCount", 0);
+                        m.put("followerCount", 0);
+                        m.put("totalPartitions", 0);
+                        m.put("underReplicated", 0);
+                        return m;
+                    });
+                    int cur = (int) brokerStats.get(p.leader().id()).get("leaderCount");
+                    brokerStats.get(p.leader().id()).put("leaderCount", cur + 1);
+                }
+                for (Node replica : p.replicas()) {
+                    brokerStats.computeIfAbsent(replica.id(), k -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", k);
+                        m.put("leaderCount", 0);
+                        m.put("followerCount", 0);
+                        m.put("totalPartitions", 0);
+                        m.put("underReplicated", 0);
+                        return m;
+                    });
+                    int cur = (int) brokerStats.get(replica.id()).get("totalPartitions");
+                    brokerStats.get(replica.id()).put("totalPartitions", cur + 1);
+                    if (p.leader() != null && replica.id() != p.leader().id()) {
+                        int fc = (int) brokerStats.get(replica.id()).get("followerCount");
+                        brokerStats.get(replica.id()).put("followerCount", fc + 1);
+                    }
+                    if (p.isr().size() < p.replicas().size()) {
+                        int ur = (int) brokerStats.get(replica.id()).get("underReplicated");
+                        brokerStats.get(replica.id()).put("underReplicated", ur + 1);
+                    }
+                }
+            }
+        }
+
+        totalLeaders = (int) brokerStats.values().stream()
+                .mapToInt(m -> (int) m.get("leaderCount")).sum();
+
+        // skew detection: leader count per broker
+        List<Integer> leaderCounts = brokerStats.values().stream()
+                .map(m -> (int) m.get("leaderCount")).sorted().toList();
+        int minLeaders = leaderCounts.isEmpty() ? 0 : leaderCounts.get(0);
+        int maxLeaders = leaderCounts.isEmpty() ? 0 : leaderCounts.get(leaderCounts.size() - 1);
+        boolean balanced = nodes.size() > 1 ? (maxLeaders - minLeaders) <= Math.max(1, totalLeaders / nodes.size() / 2) : true;
+
+        List<Map<String, Object>> brokerList = brokerStats.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>(e.getValue());
+                    Node node = nodes.stream().filter(n -> n.id() == e.getKey()).findFirst().orElse(null);
+                    m.put("host", node != null ? node.host() : "?");
+                    m.put("port", node != null ? node.port() : 0);
+                    return m;
+                }).collect(java.util.stream.Collectors.toList());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("brokers", brokerList);
+        result.put("total", Map.of(
+                "leaderCount", totalLeaders,
+                "totalReplicas", totalReplicas,
+                "brokerCount", nodes.size()));
+        result.put("balanced", balanced);
+        result.put("skewNote", balanced ? "" :
+                "Leader distribution is uneven across brokers \u2014 consider running a preferred leader election or rebalancing");
+        return result;
+    }
+
     public List<Map<String, Object>> brokerConfigs(ClusterHandle handle, int brokerId)
             throws ExecutionException, InterruptedException {
         ConfigResource resource = new ConfigResource(ConfigResource.Type.BROKER, String.valueOf(brokerId));
