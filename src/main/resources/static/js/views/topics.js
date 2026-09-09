@@ -144,10 +144,11 @@ export async function renderTopicDetail(view, topic) {
   const [detail, brokers, history] = await Promise.all([
     get(clusterPath() + `/topics/${encodeURIComponent(topic)}`),
     get(clusterPath() + '/brokers').catch(() => []),
-    get(clusterPath() + `/topics/${encodeURIComponent(topic)}/history?limit=300`).catch(() => null),
+    get(clusterPath() + `/topics/${encodeURIComponent(topic)}/history?limit=1000`).catch(() => null),
   ]);
   const historyEvents = history?.events || [];
-  let historyFilter = '';
+  let historyPage = 1;
+  const HISTORY_PAGE_SIZE = 25;
   const totalMessages = detail.partitions.reduce((sum, p) => sum + p.messageCount, 0);
 
   view.innerHTML = `
@@ -244,19 +245,19 @@ export async function renderTopicDetail(view, topic) {
         </table></div>
       </div>
     </div>
-
     <div class="card" id="history-card">
       <div class="card-title"><h2>Partition history</h2>
-        <div class="btn-row">
-          <select id="hist-partition" style="width:auto" title="Filter history by partition">
-            <option value="">All partitions</option>
-            ${detail.partitions.map((p) => `<option value="${p.partition}">p${p.partition}</option>`).join('')}
-          </select>
-          <span class="faint small">sampled every 15s · ${history && history.monitored
-            ? `since ${fmtRel(history.firstSeen)}`
-            : 'waiting for first sample'}</span>
-        </div>
+        <span class="faint small">sampled every 15s \u00b7 ${history && history.monitored
+          ? `since \${fmtRel(history.firstSeen)}`
+          : 'waiting for first sample'}</span>
       </div>
+      <p class="muted small" style="margin:0 0 10px">
+        Every 15 seconds the wrapper snapshots all partition leaders. When a leader moves
+        (election, broker restart), the ISR shrinks or replicas are reassigned, the change is
+        recorded here. Click an event for full details.
+      </p>
+      <div class="hist-summary" id="hist-summary"></div>
+      <div class="chip-row" id="hist-chips"></div>
       <div id="hist-body"></div>
     </div>`;
 
@@ -269,70 +270,151 @@ export async function renderTopicDetail(view, topic) {
     });
   });
 
-  // ---- partition history interactions ----
+  // ---- partition history: filters, per-partition tenure, grouped timeline ----
   const histBody = view.querySelector('#hist-body');
-  const histSelect = view.querySelector('#hist-partition');
+  const histSummary = view.querySelector('#hist-summary');
+  const histChips = view.querySelector('#hist-chips');
+  let partFilter = '';
+  let typeFilter = '';
+  let histPage = 1;
 
-  function renderHistoryBody() {
-    const events = historyEvents.filter((e) => historyFilter === '' || e.partition === historyFilter);
-    const countLine = `<div class="small muted mb16">${events.length} change(s)${historyFilter !== '' ? ` on p${historyFilter}` : ' across all partitions'}</div>`;
-    if (events.length === 0) {
-      histBody.innerHTML = countLine + `<div class="empty-state">${historyFilter === ''
-        ? 'No changes observed yet — leaders/ISR are stable since monitoring started. New elections, broker restarts or ISR churn appear here automatically.'
-        : 'No recorded changes for p' + esc(historyFilter) + ' — it has been stable since monitoring started.'}</div>`;
+  const TYPE_META = {
+    LEADER_CHANGED: { icon: '\u26a1', label: 'Leader changed', tone: 'accent' },
+    LEADER_OFFLINE: { icon: '\u26a1', label: 'Leader offline', tone: 'err' },
+    ISR_CHANGED: { icon: '\u21c4', label: 'ISR changed', tone: 'warn' },
+    REASSIGNED: { icon: '\u21c9', label: 'Reassigned', tone: 'cyan' },
+    PARTITION_ADDED: { icon: '\u2795', label: 'Partition added', tone: 'ok' },
+    PARTITION_REMOVED: { icon: '\u2796', label: 'Partition removed', tone: 'neutral' },
+  };
+
+  const matchesFilters = (e) =>
+    (partFilter === '' || e.partition === partFilter) &&
+    (typeFilter === '' || e.type === typeFilter);
+
+  // current leader + since-when per partition (from newest event that set a leader)
+  const tenure = (() => {
+    const map = {};
+    for (let i = historyEvents.length - 1; i >= 0; i--) {
+      const e = historyEvents[i];
+      if (!(e.partition in map) && e.toLeader != null) {
+        map[e.partition] = { leader: e.toLeader, since: e.ts };
+      }
+    }
+    return map;
+  })();
+
+  function chip(label, active, onClick) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (active ? ' active' : '');
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function renderHistory() {
+    // summary: current leader per partition
+    histSummary.innerHTML = detail.partitions.map((p) => {
+      const t = tenure[p.partition];
+      const leaderTxt = t ? `broker ${t.leader}` : 'unknown';
+      const since = t ? ` \u00b7 since ${fmtRel(t.since)}` : '';
+      const active = partFilter === '' || partFilter === p.partition;
+      return `<button class="hist-tenure ${active ? '' : 'dim'}" data-p="${p.partition}"
+        title="Show p${p.partition} history only">
+        <span class="mono">p${p.partition}</span> \u2192 leader <b>broker ${t ? t.leader : '?'}</b>${since}
+      </button>`;
+    }).join('');
+    histSummary.querySelectorAll('.hist-tenure').forEach((b) => {
+      b.addEventListener('click', () => {
+        partFilter = Number(b.dataset.p);
+        typeFilter = '';
+        renderHistory();
+      });
+    });
+
+    // filter chips
+    histChips.innerHTML = '';
+    const all = chip('All events', partFilter === '' && typeFilter === '',
+      () => { partFilter = ''; typeFilter = ''; renderHistory(); });
+    histPage = 1;
+    histChips.appendChild(all);
+    const counts = {};
+    historyEvents.forEach((e) => { counts[e.type] = (counts[e.type] || 0) + 1; });
+    Object.keys(TYPE_META).forEach((type) => {
+      if (!counts[type]) return;
+      const meta = TYPE_META[type];
+      histChips.appendChild(chip(`${meta.icon} ${meta.label} (${counts[type]})`,
+        typeFilter === type, () => { typeFilter = typeFilter === type ? '' : type; histPage = 1; renderHistory(); }));
+    });
+    histChips.appendChild(chip('Elections only', typeFilter === 'LEADER_CHANGED',
+      () => { typeFilter = typeFilter === 'LEADER_CHANGED' ? '' : 'LEADER_CHANGED'; histPage = 1; renderHistory(); }));
+
+    // timeline grouped by day, paginated (25 per page)
+    const events = historyEvents.filter(matchesFilters);
+    const PAGE = 25;
+    const pages = Math.max(1, Math.ceil(events.length / PAGE));
+    if (histPage > pages) histPage = pages;
+    const pageEvents = events.slice((histPage - 1) * PAGE, histPage * PAGE);
+    if (pageEvents.length === 0) {
+      histBody.innerHTML = `<div class="empty-state">No matching events \u2014 leaders and ISR have been
+        stable since monitoring started. Changes appear here within 15 seconds of happening.</div>`;
       return;
     }
-    histBody.innerHTML = countLine + `<div class="timeline">${events.map(timelineItem).join('')}</div>`;
+    const parts = [];
+    let lastDay = '';
+    pageEvents.forEach((e) => {
+      const meta = TYPE_META[e.type] || { icon: '\u2022', label: e.type, tone: 'neutral' };
+      const day = new Date(e.ts).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' });
+      if (day !== lastDay) {
+        parts.push(`<div class="tl-day">${esc(day)}</div>`);
+        lastDay = day;
+      }
+      const leaderLine = e.type.startsWith('LEADER') && e.fromLeader != null
+        ? `<div class="tl-move mono small">broker ${e.fromLeader} \u2192 ${e.toLeader != null ? e.toLeader : '(offline)'}</div>`
+        : '';
+      const extra = (e.isr && e.type === 'ISR_CHANGED')
+        ? `<div class="mono small muted">ISR = [${e.isr.join(', ')}]</div>` : '';
+      parts.push(`
+        <div class="tl-item tone-${meta.tone}" data-ts="${e.ts}" data-topic="${esc(e.topic)}"
+             data-partition="${e.partition}">
+          <div class="tl-head"><span class="tl-icon">${meta.icon}</span> ${eventBadge(meta.label, meta.tone)}
+            <span class="mono small">p${e.partition}</span>
+            <span class="small muted" style="margin-left:auto">${fmtRel(e.ts)}</span></div>
+          <div class="small tl-detail">${esc(e.detail || '')}</div>
+          ${leaderLine}${extra}
+        </div>`);
+    });
+    const from = (histPage - 1) * PAGE + 1;
+    const to = Math.min(histPage * PAGE, events.length);
+    const pager = pages > 1
+      ? `<div class="pager">
+          <button class="btn ghost sm" id="hist-prev" ${histPage <= 1 ? 'disabled' : ''}>← Prev</button>
+          <span class="small muted">page ${histPage} of ${pages}</span>
+          <button class="btn ghost sm" id="hist-next" ${histPage >= pages ? 'disabled' : ''}>Next →</button>
+        </div>`
+      : '';
+    histBody.innerHTML = `<div class="timeline">${parts.join('')}</div>${pager}`;
+
+    // click an event -> toggle full detail (replicas + ISR)
+    histBody.querySelectorAll('.tl-item').forEach((item) => {
+      item.addEventListener('click', () => item.classList.toggle('open'));
+    });
+    histBody.querySelector('#hist-prev')?.addEventListener('click', () => { histPage--; renderHistory(); });
+    histBody.querySelector('#hist-next')?.addEventListener('click', () => { histPage++; renderHistory(); });
   }
 
-  function setHistoryFilter(p, scroll) {
-    historyFilter = p;
-    if (histSelect) histSelect.value = String(p);
-    renderHistoryBody();
-    if (scroll) {
-      const card = document.getElementById('history-card');
-      card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
+  renderHistory();
 
-  histSelect.addEventListener('change', () => {
-    historyFilter = histSelect.value === '' ? '' : Number(histSelect.value);
-    renderHistoryBody();
-  });
-  view.querySelectorAll('#partitions-tbody tr').forEach((tr) => {
-    tr.addEventListener('click', () => setHistoryFilter(Number(tr.dataset.partition), true));
-  });
-  view.querySelectorAll('th[data-matrix-partition]').forEach((th) => {
-    th.addEventListener('click', () => setHistoryFilter(Number(th.dataset.matrixPartition), true));
-  });
-
-  // replica placement: flow/matrix view toggle + per-card history buttons
-  const flowEl = view.querySelector('#rp-flow');
-  const matrixEl = view.querySelector('#rp-matrix');
-  const flowBtn = view.querySelector('#rp-flow-btn');
-  const matrixBtn = view.querySelector('#rp-matrix-btn');
-  const showMatrix = (show) => {
-    if (!flowEl || !matrixEl) return;
-    flowEl.style.display = show ? 'none' : '';
-    matrixEl.style.display = show ? '' : 'none';
-    flowBtn.classList.toggle('primary', !show);
-    matrixBtn.classList.toggle('primary', show);
-  };
-  flowBtn?.addEventListener('click', () => showMatrix(true));
-  matrixBtn?.addEventListener('click', () => showMatrix(false));
-  view.querySelectorAll('.pcard').forEach((card) => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.pcard-hist')) return;
-      setHistoryFilter(Number(card.dataset.p), true);
-    });
-  });
-  view.querySelectorAll('.pcard-hist').forEach((b) => {
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      setHistoryFilter(Number(b.dataset.p), true);
-    });
-  });
-  renderHistoryBody();
+  // silent auto-refresh of history data every 15s while this page is visible
+  clearInterval(window.__histTimer);
+  window.__histTimer = setInterval(async () => {
+    if (!document.getElementById('history-card')) { clearInterval(window.__histTimer); return; }
+    try {
+      historyEvents.length = 0;
+      const fresh = await get(clusterPath() + `/topics/${encodeURIComponent(topic)}/history?limit=300`);
+      (fresh?.events || []).forEach((e) => historyEvents.push(e));
+      renderHistory();
+    } catch { /* cluster briefly unreachable - keep old view */ }
+  }, 15000);
 
   const search = view.querySelector('#config-search');
   const tbody = view.querySelector('#config-rows');

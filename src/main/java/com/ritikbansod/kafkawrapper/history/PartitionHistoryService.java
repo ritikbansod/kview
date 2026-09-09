@@ -197,12 +197,14 @@ public class PartitionHistoryService {
 
     // ---------- queries ----------
 
-    public Map<String, Object> historyFor(String clusterId, String topicFilter, int limit) {
+    public Map<String, Object> historyFor(String clusterId, String topicFilter, int limit, int offset) {
         ClusterHistory history = byCluster.get(clusterId);
         Map<String, Object> result = new LinkedHashMap<>();
         if (history == null) {
             result.put("monitored", false);
             result.put("events", List.of());
+            result.put("total", 0);
+            result.put("hasMore", false);
             return result;
         }
         synchronized (history) {
@@ -211,11 +213,16 @@ public class PartitionHistoryService {
                     .toList();
             List<ChangeEvent> newestFirst = new ArrayList<>(filtered);
             java.util.Collections.reverse(newestFirst);
+            int total = newestFirst.size();
+            int from = Math.min(Math.max(offset, 0), total);
+            int to = Math.min(from + Math.max(limit, 1), total);
             result.put("monitored", true);
             result.put("firstSeen", history.firstSeen);
             result.put("lastPoll", history.lastPoll);
-            result.put("total", filtered.size());
-            result.put("events", newestFirst.stream().limit(Math.max(1, limit)).toList());
+            result.put("total", total);
+            result.put("offset", from);
+            result.put("hasMore", to < total);
+            result.put("events", newestFirst.subList(from, to));
         }
         return result;
     }

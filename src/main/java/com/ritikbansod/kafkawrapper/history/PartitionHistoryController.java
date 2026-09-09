@@ -23,19 +23,20 @@ public class PartitionHistoryController {
         this.historyService = historyService;
     }
 
-    /** Change history for one topic (newest first). */
+    /** Change history for one topic (newest first, offset-paginated). */
     @GetMapping("/topics/{topic}/history")
     public Map<String, Object> topicHistory(@PathVariable String clusterId, @PathVariable String topic,
-                                            @RequestParam(defaultValue = "200") int limit) {
-        return historyService.historyFor(clusterId, topic, limit);
+                                            @RequestParam(defaultValue = "200") int limit,
+                                            @RequestParam(defaultValue = "0") int offset) {
+        return historyService.historyFor(clusterId, topic, limit, offset);
     }
 
-    /** Change history across all topics of the cluster (newest first). */
+    /** Change history across all topics of the cluster (newest first, offset-paginated). */
     @GetMapping("/history")
     public Map<String, Object> clusterHistory(@PathVariable String clusterId,
-                                              @RequestParam(defaultValue = "500") int limit) {
-        Map<String, Object> result = historyService.historyFor(clusterId, null, limit);
-        return result;
+                                              @RequestParam(defaultValue = "500") int limit,
+                                              @RequestParam(defaultValue = "0") int offset) {
+        return historyService.historyFor(clusterId, null, limit, offset);
     }
 
     /** Clears recorded history for the cluster (monitoring continues). */

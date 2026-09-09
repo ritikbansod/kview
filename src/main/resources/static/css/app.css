@@ -490,6 +490,28 @@ table.matrix td:first-child { text-align: left; }
 .cell-oor { background: var(--err-soft); color: var(--err); }
 .cell-none { color: var(--faint); }
 
+/* ===== Partition history ===== */
+.hist-summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.hist-tenure {
+  background: var(--bg); border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 6px 12px; font-size: 12.5px; color: var(--text); cursor: pointer; font-family: var(--sans);
+}
+.hist-tenure:hover { border-color: var(--accent); }
+.hist-tenure.dim { opacity: 0.55; }
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.tl-day {
+  font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .6px; margin: 14px 0 6px;
+}
+.tl-icon { font-size: 14px; margin-right: 2px; }
+.tl-move { color: var(--accent); margin-top: 2px; }
+.timeline .tl-item { cursor: default; }
+.tone-accent { border-color: var(--accent); }
+.tone-err { border-color: var(--err); }
+.tone-warn { border-color: var(--warn); }
+.tone-cyan { border-color: var(--cyan); }
+.tone-ok { border-color: var(--ok); }
+
 /* ===== Partition history timeline ===== */
 .timeline { position: relative; padding-left: 22px; }
 .timeline::before { content: ""; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; background: var(--border-soft); }
