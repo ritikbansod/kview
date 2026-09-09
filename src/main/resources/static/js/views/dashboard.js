@@ -47,18 +47,18 @@ async function load(view) {
     </div>
 
     <div class="grid-kpi">
-      <div class="kpi"><div class="label">Brokers</div><div class="value">${fmtNum(overview.brokers?.length)}</div></div>
-      <div class="kpi"><div class="label">Topics</div><div class="value">${fmtNum(overview.topicCount)}</div></div>
-      <div class="kpi"><div class="label">Partitions</div><div class="value">${fmtNum(overview.partitionCount)}</div></div>
-      <div class="kpi"><div class="label">Messages (est.)</div><div class="value">${fmtCompact(overview.estimatedMessages)}</div></div>
-      <div class="kpi"><div class="label">Consumer groups</div><div class="value">${fmtNum(overview.consumerGroupCount < 0 ? '—' : overview.consumerGroupCount)}</div></div>
-      <div class="kpi ${urp > 0 ? 'warn' : 'ok'}"><div class="label">Under-replicated</div><div class="value">${fmtNum(urp)}</div></div>
-      <div class="kpi ${offline > 0 ? 'err' : 'ok'}"><div class="label">Offline partitions</div><div class="value">${fmtNum(offline)}</div></div>
+      <div class="kpi clickable" data-scroll="broker-table"><div class="label">Brokers</div><div class="value">${fmtNum(overview.brokers?.length)}</div></div>
+      <div class="kpi clickable" data-goto="#/topics"><div class="label">Topics</div><div class="value">${fmtNum(overview.topicCount)}</div></div>
+      <div class="kpi clickable" data-goto="#/topics"><div class="label">Partitions</div><div class="value">${fmtNum(overview.partitionCount)}</div></div>
+      <div class="kpi clickable" data-goto="#/explorer"><div class="label">Messages (est.)</div><div class="value">${fmtCompact(overview.estimatedMessages)}</div></div>
+      <div class="kpi clickable" data-goto="#/groups"><div class="label">Consumer groups</div><div class="value">${fmtNum(overview.consumerGroupCount < 0 ? '—' : overview.consumerGroupCount)}</div></div>
+      <div class="kpi clickable ${urp > 0 ? 'warn' : 'ok'}" data-goto="#/topics"><div class="label">Under-replicated</div><div class="value">${fmtNum(urp)}</div></div>
+      <div class="kpi clickable ${offline > 0 ? 'err' : 'ok'}" data-goto="#/topics"><div class="label">Offline partitions</div><div class="value">${fmtNum(offline)}</div></div>
     </div>
 
     <div class="two-col">
       <div>
-        <div class="card">
+        <div class="card" data-broker-table>
           <div class="card-title"><h2>Brokers</h2><span class="faint small">click a broker for its config</span></div>
           <div class="table-wrap"><table class="tbl">
             <thead><tr><th>ID</th><th>Endpoint</th><th>Rack</th><th></th></tr></thead>
@@ -103,6 +103,18 @@ async function load(view) {
   view.querySelectorAll('tr[data-broker]').forEach((tr) => {
     tr.addEventListener('click', () => brokerConfigsModal(Number(tr.dataset.broker)));
   });
+
+  // clickable KPI cards route to their pages
+  view.querySelectorAll('.kpi[data-goto]').forEach((card) => {
+    card.addEventListener('click', () => { location.hash = card.dataset.goto; });
+  });
+  // brokers card scrolls to the broker table on the same page
+  view.querySelectorAll('.kpi[data-scroll]').forEach((card) => {
+    card.addEventListener('click', () => {
+      document.querySelector('[data-broker-table]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
   wireAutoRefresh(view);
 }
 
