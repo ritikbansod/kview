@@ -79,6 +79,22 @@ There is also a JSON API that mirrors everything the UI does (produce, browse, t
 topic and group management), mounted under `/api/clusters/{clusterId}/...`, with a
 connection tester at `POST /api/clusters/test`. Health check at `/actuator/health`.
 
+## CLI
+
+The same API also has a command line client, `cli/kview.mjs` (Node 18+, no
+dependencies). It talks to any running Kview server, local or remote:
+
+```
+node cli/kview.mjs overview
+node cli/kview.mjs browse orders --start latest --limit 10
+node cli/kview.mjs produce orders -k k1 -v '{"orderId":42}' -H source=ci
+node cli/kview.mjs tail orders
+node cli/kview.mjs lag orders-worker
+```
+
+Point it at another instance with `--server` (env `KVIEW_URL`) and another cluster
+with `--cluster` (env `KVIEW_CLUSTER`). `kview help` lists every command.
+
 ## Configuration
 
 | Env var | Default | Meaning |
