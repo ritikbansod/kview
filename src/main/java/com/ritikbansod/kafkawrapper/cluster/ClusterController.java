@@ -17,10 +17,13 @@ public class ClusterController {
 
     private final KafkaClusterManager manager;
     private final ClusterService clusterService;
+    private final BrokerPartitionService brokerPartitionService;
 
-    public ClusterController(KafkaClusterManager manager, ClusterService clusterService) {
+    public ClusterController(KafkaClusterManager manager, ClusterService clusterService,
+                             BrokerPartitionService brokerPartitionService) {
         this.manager = manager;
         this.clusterService = clusterService;
+        this.brokerPartitionService = brokerPartitionService;
     }
 
     @GetMapping("/overview")
@@ -50,6 +53,12 @@ public class ClusterController {
     public Map<String, Object> brokerDistribution(@PathVariable String clusterId)
             throws ExecutionException, InterruptedException {
         return clusterService.brokerDistribution(manager.get(clusterId));
+    }
+
+    @GetMapping("/brokers/{brokerId}/partitions")
+    public Map<String, Object> brokerPartitions(@PathVariable String clusterId, @PathVariable int brokerId)
+            throws ExecutionException, InterruptedException {
+        return brokerPartitionService.partitionsOnBroker(manager.get(clusterId), brokerId);
     }
 
     @GetMapping("/acls")
