@@ -334,8 +334,7 @@ export async function renderTopicDetail(view, topic) {
     // filter chips
     histChips.innerHTML = '';
     const all = chip('All events', partFilter === '' && typeFilter === '',
-      () => { partFilter = ''; typeFilter = ''; renderHistory(); });
-    histPage = 1;
+      () => { partFilter = ''; typeFilter = ''; histPage = 1; renderHistory(); });
     histChips.appendChild(all);
     const counts = {};
     historyEvents.forEach((e) => { counts[e.type] = (counts[e.type] || 0) + 1; });
