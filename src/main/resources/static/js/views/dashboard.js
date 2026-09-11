@@ -125,8 +125,8 @@ async function load(view) {
   view.querySelectorAll('.dist-broker').forEach((el) => {
     el.style.cursor = 'pointer';
     el.addEventListener('click', () => {
-      const brokerId = Number(el.querySelector('[data-broker-id]')?.dataset.brokerId);
-      if (brokerId != null) brokerPartitionsModal(brokerId);
+      const brokerId = Number(el.dataset.brokerId);
+      if (brokerId > 0) brokerPartitionsModal(brokerId);
     });
   });
 
@@ -146,7 +146,7 @@ function renderDistribution(distribution) {
         const leaderPct = b.totalPartitions > 0 ? Math.round((b.leaderCount / b.totalPartitions) * 100) : 0;
         const followerPct = b.totalPartitions > 0 ? 100 - leaderPct : 0;
         return `
-          <div class="dist-broker">
+          <div class="dist-broker" data-broker-id="${b.id}">
             <div class="dist-head">
               <span class="mono fw-bold">broker ${b.id}</span>
               <span class="faint small">${esc(b.host)}:${esc(b.port)}</span>

@@ -32,6 +32,7 @@ export async function render() {
   window.__tailClose = null;
   window.__dashStop?.();   // stops dashboard auto-refresh when leaving the view
   window.__dashStop = null;
+  window.scrollTo({ top: 0, behavior: 'instant' });
   const { path, query } = parseHash();
   const route = routes.find((r) => r.pattern.test(path)) || routes[0];
   const match = path.match(route.pattern);
