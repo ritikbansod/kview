@@ -81,26 +81,47 @@ connection tester at `POST /api/clusters/test`. Health check at `/actuator/healt
 
 ## CLI
 
-A Node.js terminal client wraps the REST API — `kview-cli.js` (Node 18+, no
-dependencies). It talks to any running Kview server, local or remote:
+Two command-line clients ship with the repo. Both talk to a running Kview
+server via its REST API — local or remote.
 
-```
-node kview-cli.js overview
-node kview-cli.js brokers
-node kview-cli.js topics
-node kview-cli.js topic orders
-node kview-cli.js create my-topic 3 3
-node kview-cli.js delete my-topic
-node kview-cli.js produce orders my-key '{"orderId":42}'
-node kview-cli.js browse orders
-node kview-cli.js groups
-node kview-cli.js group my-group
-node kview-cli.js distribution
-node kview-cli.js history orders
+### `kview-cli.js` (Node 18+, no dependencies)
+
+```bash
+node kview-cli.js overview                              # cluster KPIs
+node kview-cli.js brokers                               # broker list
+node kview-cli.js distribution                          # leader/follower per broker
+node kview-cli.js topics                                # all topics with counts
+node kview-cli.js topic orders                          # topic detail + partitions
+node kview-cli.js create my-topic 3 3                   # create topic
+node kview-cli.js delete my-topic                       # delete topic
+node kview-cli.js produce orders my-key '{"data":1}'    # produce message
+node kview-cli.js produce-n orders 10                   # produce 10 test messages
+node kview-cli.js browse orders                         # latest 10 messages
+node kview-cli.js browse-first orders                   # earliest 10 messages
+node kview-cli.js groups                                # consumer groups + lag
+node kview-cli.js group my-group                        # group detail
+node kview-cli.js history orders                        # leader/ISR history
+node kview-cli.js connections                           # configured clusters
 ```
 
-Windows shortcut: `kview.bat` wraps the Node script. Point it at another
-instance with `KVIEW_URL=http://host:port` (default `http://localhost:8090`).
+Set `KVIEW_URL=http://host:port` to target a remote Kview instance.
+
+### `cli/kview.mjs` (older client, Node 18+)
+
+```bash
+node cli/kview.mjs overview
+node cli/kview.mjs topics
+node cli/kview.mjs topic-create my-topic --partitions 3 --rf 3
+node cli/kview.mjs produce orders -k k1 -v '{"orderId":42}' -H source=ci
+node cli/kview.mjs browse orders --start latest --limit 10
+node cli/kview.mjs tail orders
+node cli/kview.mjs lag my-group
+node cli/kview.mjs groups
+```
+
+Point it at another server with `--server http://host:port` (env `KVIEW_URL`)
+and another cluster with `--cluster ID` (env `KVIEW_CLUSTER`). Use `--json`
+for raw output.
 
 ## Configuration
 
