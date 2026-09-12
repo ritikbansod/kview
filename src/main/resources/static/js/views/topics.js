@@ -179,7 +179,7 @@ export async function renderTopicDetail(view, topic) {
           <span class="chev">▾</span>
         </div>
         <div class="collapsible-body">
-          <div class="table-wrap"><table class="tbl">
+          <div class="table-wrap scroll-body"><table class="tbl">
             <thead><tr><th>Partition</th><th class="num">Leader</th><th>Replicas</th><th>ISR</th><th class="num">Beginning</th><th class="num">End</th><th class="num">Messages</th></tr></thead>
             <tbody id="partitions-tbody">
               ${detail.partitions.map((p) => `
@@ -206,7 +206,7 @@ export async function renderTopicDetail(view, topic) {
         </div>
         <div class="collapsible-body">
           <div style="margin-bottom:8px"><input type="text" id="config-search" placeholder="Filter configs…" style="width:100%" /></div>
-          <div class="table-wrap" style="max-height:420px; overflow-y:auto"><table class="tbl">
+          <div class="table-wrap scroll-body"><table class="tbl">
             <thead><tr><th>Name</th><th>Value</th><th>Source</th><th></th></tr></thead>
             <tbody id="config-rows">${configRows(detail.configs, '')}</tbody>
           </table></div>
@@ -248,7 +248,7 @@ export async function renderTopicDetail(view, topic) {
     <div class="card" id="history-card">
       <div class="card-title"><h2>Partition history</h2>
         <span class="faint small">sampled every 15s \u00b7 ${history && history.monitored
-          ? `since \${fmtRel(history.firstSeen)}`
+          ? `since ${fmtRel(history.firstSeen)}`
           : 'waiting for first sample'}</span>
       </div>
       <p class="muted small" style="margin:0 0 10px">

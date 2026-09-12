@@ -443,6 +443,9 @@ fieldset.section legend { font-size: 12px; color: var(--accent); font-weight: 65
 @keyframes shimmer { to { transform: translateX(100%); } }
 .skeleton-row { display: grid; gap: 12px; align-items: center; padding: 9px 10px; border-bottom: 1px solid var(--border-soft); }
 
+/* ===== Card internal scrolling ===== */
+.scroll-body { max-height: 400px; overflow-y: auto; }
+
 /* ===== Collapsible cards ===== */
 .collapsible-title { cursor: pointer; user-select: none; }
 .collapsible .chev { display: inline-block; transition: transform .15s; color: var(--faint); margin-left: 8px; }
@@ -462,7 +465,7 @@ fieldset.section legend { font-size: 12px; color: var(--accent); font-weight: 65
 .dist-nums { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* ===== Replica flow cards ===== */
-.pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; max-height: 500px; overflow-y: auto; }
 .pcard { background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: border-color .12s; }
 .pcard:hover { border-color: var(--accent); }
 .pcard-bad { border-color: var(--err); }
@@ -531,7 +534,7 @@ table.matrix td:first-child { text-align: left; }
 .tone-ok { border-color: var(--ok); }
 
 /* ===== Partition history timeline ===== */
-.timeline { position: relative; padding-left: 22px; }
+.timeline { position: relative; padding-left: 22px; max-height: 480px; overflow-y: auto; }
 .timeline::before { content: ""; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; background: var(--border-soft); }
 .tl-item { position: relative; padding: 6px 0 12px; }
 .tl-item::before { content: ""; position: absolute; left: -20px; top: 12px; width: 9px; height: 9px; border-radius: 50%; background: var(--panel-2); border: 2px solid var(--accent); }
