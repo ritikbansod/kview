@@ -1,6 +1,7 @@
 // ===== Architecture: producers → cluster (brokers · topics · partitions) → consumers =====
 import { get, clusterPath } from '../api.js';
-import { esc, fmtNum, fmtCompact, fmtRel, badge, skeletonTable, modal, debounce } from '../ui.js';
+import { esc, fmtNum, fmtCompact, fmtRel, badge, skeletonTable, debounce } from '../ui.js';
+import { brokerPartitionsModal } from './broker-modal.js';
 
 const MAX_TOPIC_CARDS = 12;
 const MAX_GROUP_CARDS = 8;
@@ -142,7 +143,8 @@ async function load(view) {
 
   // interactions
   view.querySelectorAll('.arch-broker-chip').forEach((chip) => {
-    chip.addEventListener('click', () => brokerPartitionsModal(Number(chip.dataset.broker)));
+    chip.addEventListener('click', () =>
+      brokerPartitionsModal(Number(chip.dataset.broker), topo.brokers.map((b) => b.id)));
   });
   view.querySelectorAll('.arch-topic-card').forEach((card) => {
     card.addEventListener('click', () => { location.hash = `#/topics/${encodeURIComponent(card.dataset.topic)}`; });
@@ -256,31 +258,6 @@ function highlight(topic, group) {
   svg.querySelectorAll('path').forEach((p) => {
     const hit = topic ? p.dataset.topic === topic : p.dataset.group === group;
     p.classList.toggle('hl', hit);
-  });
-}
-
-// ---- broker drill-down ------------------------------------------------
-
-async function brokerPartitionsModal(brokerId) {
-  let data;
-  try {
-    data = await get(clusterPath() + `/brokers/${brokerId}/partitions`);
-  } catch (err) {
-    modal({ title: `Broker ${brokerId} partitions`, body: `<div class="error-panel">${esc(err.message)}</div>`, actions: [{ label: 'Close', class: 'ghost', onClick: (o, c) => c() }] });
-    return;
-  }
-  const table = (items, role) => items.length === 0
-    ? `<div class="empty-state">No ${role} partitions</div>`
-    : `<table class="tbl"><thead><tr><th>Topic</th><th class="num">Partition</th><th class="num">Leader</th><th>ISR</th></tr></thead><tbody>
-        ${items.map((p) => `<tr><td class="mono">${esc(p.topic)}</td><td class="num">${p.partition}</td>
-          <td class="num">${p.leader}</td><td class="mono small">[${p.isr.join(',')}]</td></tr>`).join('')}
-      </tbody></table>`;
-  modal({
-    title: `Broker ${brokerId} — ${data.leader.length} leader + ${data.follower.length} follower partitions`,
-    wide: true,
-    body: `<h3 style="margin:0 0 8px;color:var(--accent)">Leader partitions (${data.leader.length})</h3>${table(data.leader, 'leader')}
-      <h3 style="margin:16px 0 8px;color:var(--cyan)">Follower partitions (${data.follower.length})</h3>${table(data.follower, 'follower')}`,
-    actions: [{ label: 'Close', class: 'ghost', onClick: (o, c) => c() }],
   });
 }
 

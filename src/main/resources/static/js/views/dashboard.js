@@ -1,6 +1,7 @@
 // ===== Dashboard: cluster KPIs, brokers (+configs), partition distribution, top topics, ACLs =====
 import { get, clusterPath } from '../api.js';
 import { esc, fmtNum, fmtCompact, fmtRel, badge, skeletonTable, modal, debounce, focusable } from '../ui.js';
+import { brokerPartitionsModal } from './broker-modal.js';
 
 let dashTimer = null;
 let autoRefresh = false; // survives load() re-renders so the checkbox reflects reality
@@ -128,7 +129,9 @@ async function load(view) {
     el.style.cursor = 'pointer';
     el.addEventListener('click', () => {
       const brokerId = Number(el.dataset.brokerId);
-      if (brokerId > 0) brokerPartitionsModal(brokerId);
+      if (brokerId > 0) {
+        brokerPartitionsModal(brokerId, (distribution?.brokers ?? []).map((b) => b.id));
+      }
     });
   });
 
@@ -264,37 +267,4 @@ function renderAcls(acls) {
         <td class="mono small">${esc(b.host)}</td>
       </tr>`).join('')}
     </tbody></table></div>`;
-}
-
-
-async function brokerPartitionsModal(brokerId) {
-  let data;
-  try {
-    data = await get(clusterPath() + `/brokers/${brokerId}/partitions`);
-  } catch (err) {
-    modal({ title: `Broker ${brokerId} partitions`, body: `<div class="error-panel">${esc(err.message)}</div>`, actions: [{ label: 'Close', class: 'ghost', onClick: (o, c) => c() }] });
-    return;
-  }
-  const renderList = (items, role) => items.length === 0
-    ? `<div class="empty-state">No ${role} partitions</div>`
-    : `<table class="tbl"><thead><tr><th>Topic</th><th class="num">Partition</th><th class="num">Leader</th><th>ISR</th><th>In sync</th></tr></thead><tbody>
-        ${items.map((p) => `<tr>
-          <td class="mono">${esc(p.topic)}</td>
-          <td class="num">${p.partition}</td>
-          <td class="num">${p.leader}</td>
-          <td class="mono small">[${p.isr.join(',')}]</td>
-          <td>${p.inSync ? badge('yes', 'ok') : badge('no', 'err')}</td>
-        </tr>`).join('')}
-      </tbody></table>`;
-
-  modal({
-    title: `Broker ${brokerId} — ${data.leader.length} leader + ${data.follower.length} follower partitions`,
-    wide: true,
-    body: `
-      <h3 style="margin:0 0 8px;color:var(--accent)">Leader partitions (${data.leader.length})</h3>
-      ${renderList(data.leader, 'leader')}
-      <h3 style="margin:16px 0 8px;color:var(--cyan)">Follower partitions (${data.follower.length})</h3>
-      ${renderList(data.follower, 'follower')}`,
-    actions: [{ label: 'Close', class: 'ghost', onClick: (o, c) => c() }],
-  });
 }

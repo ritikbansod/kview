@@ -657,3 +657,11 @@ tr[tabindex]:focus-visible, .pcard:focus-visible {
   .arch-edges path.flow { animation: none; }
 }
 .arch-pchip.more { color: var(--faint); border-style: dashed; }
+
+/* ===== Fixed-height modal: card stays constant, body scrolls ===== */
+.modal.modal-tall { max-height: calc(100vh - 96px); display: flex; flex-direction: column; }
+.modal.modal-tall .modal-body { overflow-y: auto; min-height: 0; }
+.arch-broker-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-soft); }
+button.arch-broker-chip { font: inherit; color: var(--text); background: var(--panel); }
+button.arch-broker-chip:hover { border-color: var(--accent); }
+.arch-broker-chip.is-active { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-soft); }
