@@ -81,19 +81,26 @@ connection tester at `POST /api/clusters/test`. Health check at `/actuator/healt
 
 ## CLI
 
-The same API also has a command line client, `cli/kview.mjs` (Node 18+, no
+A Node.js terminal client wraps the REST API — `kview-cli.js` (Node 18+, no
 dependencies). It talks to any running Kview server, local or remote:
 
 ```
-node cli/kview.mjs overview
-node cli/kview.mjs browse orders --start latest --limit 10
-node cli/kview.mjs produce orders -k k1 -v '{"orderId":42}' -H source=ci
-node cli/kview.mjs tail orders
-node cli/kview.mjs lag orders-worker
+node kview-cli.js overview
+node kview-cli.js brokers
+node kview-cli.js topics
+node kview-cli.js topic orders
+node kview-cli.js create my-topic 3 3
+node kview-cli.js delete my-topic
+node kview-cli.js produce orders my-key '{"orderId":42}'
+node kview-cli.js browse orders
+node kview-cli.js groups
+node kview-cli.js group my-group
+node kview-cli.js distribution
+node kview-cli.js history orders
 ```
 
-Point it at another instance with `--server` (env `KVIEW_URL`) and another cluster
-with `--cluster` (env `KVIEW_CLUSTER`). `kview help` lists every command.
+Windows shortcut: `kview.bat` wraps the Node script. Point it at another
+instance with `KVIEW_URL=http://host:port` (default `http://localhost:8090`).
 
 ## Configuration
 
