@@ -1,8 +1,9 @@
 // ===== Dashboard: cluster KPIs, brokers (+configs), partition distribution, top topics, ACLs =====
 import { get, clusterPath } from '../api.js';
-import { esc, fmtNum, fmtCompact, fmtRel, badge, skeletonTable, modal, debounce } from '../ui.js';
+import { esc, fmtNum, fmtCompact, fmtRel, badge, skeletonTable, modal, debounce, focusable } from '../ui.js';
 
 let dashTimer = null;
+let autoRefresh = false; // survives load() re-renders so the checkbox reflects reality
 
 export async function renderDashboard(view) {
   if (dashTimer) { clearInterval(dashTimer); dashTimer = null; }
@@ -11,7 +12,7 @@ export async function renderDashboard(view) {
     <div class="toolbar" style="align-items:center">
       <h1 style="margin:0">Cluster overview</h1>
       <div class="spacer" style="flex:1"></div>
-      <label class="checkbox small"><input type="checkbox" id="auto-refresh" /> auto-refresh (10s)</label>
+      <label class="checkbox small"><input type="checkbox" id="auto-refresh" ${autoRefresh ? 'checked' : ''} /> auto-refresh (10s)</label>
       <span class="faint small" id="updated-at">updated ${fmtRel(Date.now())}</span>
     </div>
     <div class="grid-kpi">
@@ -43,7 +44,7 @@ async function load(view) {
     <div class="toolbar" style="align-items:center">
       <h1 style="margin:0">Cluster overview</h1>
       <div class="spacer" style="flex:1"></div>
-      <label class="checkbox small"><input type="checkbox" id="auto-refresh" /> auto-refresh (10s)</label>
+      <label class="checkbox small"><input type="checkbox" id="auto-refresh" ${autoRefresh ? 'checked' : ''} /> auto-refresh (10s)</label>
       <span class="faint small" id="updated-at">updated ${fmtRel(Date.now())}</span>
     </div>
 
@@ -109,6 +110,7 @@ async function load(view) {
     </div>`;
 
   view.querySelectorAll('tr[data-broker]').forEach((tr) => {
+    focusable(tr);
     tr.addEventListener('click', () => brokerConfigsModal(Number(tr.dataset.broker)));
   });
 
@@ -183,8 +185,12 @@ function wireAutoRefresh(view) {
   };
   const stop = () => { if (dashTimer) { clearInterval(dashTimer); dashTimer = null; } };
   window.__dashStop = stop; // main.js render() calls this on every route change
-  box?.addEventListener('change', () => {
-    if (box.checked) {
+  if (autoRefresh && !dashTimer) dashTimer = setInterval(() => load(view), 10_000);
+  if (!box) return;
+  box.checked = autoRefresh; // re-renders must not visually uncheck a running refresh
+  box.addEventListener('change', () => {
+    autoRefresh = box.checked;
+    if (autoRefresh) {
       dashTimer = setInterval(() => load(view), 10_000);
       stamp();
     } else {

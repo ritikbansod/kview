@@ -16,7 +16,7 @@ export async function renderGroups(view) {
     return (va < vb ? -1 : va > vb ? 1 : 0) * sortState.dir;
   });
   const bodyRows = () => sorted().map((g) => `
-    <tr class="clickable" data-group="${esc(g.groupId)}">
+    <tr class="clickable" tabindex="0" data-group="${esc(g.groupId)}">
       <td class="mono">${esc(g.groupId)}</td>
       <td>${badge(g.state, stateTone(g.state))}</td>
       <td class="num">${g.committedPartitions}</td>
@@ -29,7 +29,9 @@ export async function renderGroups(view) {
       <h1 style="margin:0">Consumer Groups <span class="muted small">(${groups.length})</span></h1>
     </div>
     <div class="card">
-      ${groups.length === 0 ? '<div class="empty-state">No consumer groups on this cluster</div>' : `
+      ${groups.length === 0 ? `<div class="empty-state">No consumer groups on this cluster
+        <p class="small faint" style="margin:8px 0 0">Groups appear once an application consumes a topic with a
+        group.id — or tail a topic with a group set in the Data Explorer to see one form.</p></div>` : `}
       <div class="table-wrap"><table class="tbl">
         <thead><tr>
           <th class="sortable" data-key="groupId">Group ID</th>
@@ -53,6 +55,12 @@ export async function renderGroups(view) {
       tr.addEventListener('click', () => {
         location.hash = `#/groups/${encodeURIComponent(tr.dataset.group)}`;
       });
+    });
+    tbody.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-group]')) {
+        e.preventDefault();
+        e.target.click();
+      }
     });
   }
 }

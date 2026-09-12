@@ -106,6 +106,16 @@ themeBtn.addEventListener('click', () => {
 });
 paintThemeBtn();
 
+// ---- keyboard shortcuts: 1-5 jump between views ----
+const SHORTCUTS = { 1: '#/', 2: '#/topics', 3: '#/explorer', 4: '#/groups', 5: '#/connections' };
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+  if (document.querySelector('.modal-overlay')) return;
+  if (SHORTCUTS[e.key]) location.hash = SHORTCUTS[e.key];
+});
+
 loadClusters().then(render).catch((err) => {
   document.getElementById('view').innerHTML =
     `<h1>Backend unreachable</h1><div class="error-panel">${esc(err.message || err)}</div>

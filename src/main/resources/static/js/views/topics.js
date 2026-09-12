@@ -1,7 +1,7 @@
 // ===== Topics: list + full topic detail (partitions, configs, lifecycle) =====
 import { get, post, put, del, clusterPath } from '../api.js';
 import {
-  esc, fmtNum, fmtCompact, badge, skeletonTable, toast, confirmDialog, modal, debounce, makeSortable, fmtRel,
+  esc, fmtNum, fmtCompact, badge, skeletonTable, toast, confirmDialog, modal, debounce, makeSortable, fmtRel, focusable,
 } from '../ui.js';
 
 export async function renderTopics(view) {
@@ -24,7 +24,7 @@ export async function renderTopics(view) {
     .filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
     .sort((a, b) => compare(a, b, sortState.key) * sortState.dir)
     .map((t) => `
-      <tr class="clickable" data-topic="${esc(t.name)}">
+      <tr class="clickable" tabindex="0" data-topic="${esc(t.name)}">
         <td class="mono">${esc(t.name)} ${t.internal ? badge('internal', 'neutral') : ''}</td>
         <td class="num">${t.partitions}</td>
         <td class="num">${t.replicationFactor}</td>
@@ -32,7 +32,7 @@ export async function renderTopics(view) {
         <td>${t.underReplicatedPartitions > 0 ? badge(t.underReplicatedPartitions + ' URP', 'err') : badge('healthy', 'ok')}</td>
         <td>
           <a class="link small" href="#/explorer?topic=${encodeURIComponent(t.name)}" data-stop>explore</a>
-          <a class="link small" data-stop data-delete="${esc(t.name)}">delete</a>
+          <a class="link small danger-link" data-stop data-delete="${esc(t.name)}">delete</a>
         </td>
       </tr>`).join('');
 
@@ -76,6 +76,13 @@ export async function renderTopics(view) {
     if (e.target.closest('[data-stop]')) return;
     const tr = e.target.closest('tr[data-topic]');
     if (tr) location.hash = `#/topics/${encodeURIComponent(tr.dataset.topic)}`;
+  });
+  // keyboard activation for row navigation (survives search/sort re-renders)
+  tbody.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-topic]')) {
+      e.preventDefault();
+      e.target.click();
+    }
   });
 
   view.querySelector('#create-topic-btn').addEventListener('click', () => createTopicModal(() => renderTopics(view)));
@@ -163,6 +170,7 @@ export async function renderTopicDetail(view, topic) {
       </div>
       <div class="spacer" style="flex:1"></div>
       <div class="btn-row">
+        <a class="btn ghost" href="#/topics">← all topics</a>
         <a class="btn ghost" href="#/explorer?topic=${encodeURIComponent(detail.name)}">Explore data</a>
         <a class="btn ghost" href="#/explorer?topic=${encodeURIComponent(detail.name)}&tab=tail">Live tail</a>
         <a class="btn ghost" href="#/explorer?topic=${encodeURIComponent(detail.name)}&tab=produce">Produce</a>
@@ -402,6 +410,31 @@ export async function renderTopicDetail(view, topic) {
   }
 
   renderHistory();
+
+  // the explainer promises "click any partition card to see its history" — deliver it
+  const showPartitionHistory = (p) => {
+    partFilter = Number(p);
+    typeFilter = '';
+    renderHistory();
+    document.getElementById('history-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  view.querySelectorAll('.pcard').forEach((card) => {
+    focusable(card);
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, input')) return;
+      showPartitionHistory(card.dataset.p);
+    });
+  });
+  view.querySelectorAll('.pcard-hist').forEach((b) => {
+    b.addEventListener('click', (e) => { e.stopPropagation(); showPartitionHistory(b.dataset.p); });
+  });
+  view.querySelectorAll('#partitions-tbody tr[data-partition]').forEach((tr) => {
+    focusable(tr);
+    tr.addEventListener('click', () => showPartitionHistory(tr.dataset.partition));
+  });
+  view.querySelectorAll('th[data-matrix-partition]').forEach((th) => {
+    th.addEventListener('click', () => showPartitionHistory(th.dataset.matrixPartition));
+  });
 
   // silent auto-refresh of history data every 15s while this page is visible
   clearInterval(window.__histTimer);

@@ -1,7 +1,7 @@
 // ===== Data Explorer: browse (seek-based), live tail (SSE), produce =====
 import { get, post, clusterPath, loadTopics } from '../api.js';
 import {
-  esc, fmtNum, fmtTs, fmtRel, badge, spinner, toast, modal, jsonBlock, previewValue, copyText,
+  esc, fmtNum, fmtTs, fmtRel, badge, spinner, toast, modal, jsonBlock, previewValue, copyText, focusable, debounce,
 } from '../ui.js';
 
 let topicOptions = [];
@@ -37,22 +37,32 @@ export async function renderExplorer(view, query = {}) {
   const panel = view.querySelector('#ex-panel');
   const topicSelect = view.querySelector('#ex-topic');
   let partitionCount = topicOptions.find((t) => t.name === topicSelect.value)?.partitions ?? 1;
+  let currentTab = tab;
 
-  const show = (which) =>
-    ({ browse: renderBrowse, tail: renderTail, produce: renderProduce })[which](panel, topicSelect, () => partitionCount);
+  // keep the URL shareable without triggering a re-render loop
+  const syncUrl = () => history.replaceState(null, '',
+    `#/explorer?topic=${encodeURIComponent(topicSelect.value)}` +
+    (currentTab !== 'browse' ? `&tab=${currentTab}` : ''));
+
+  const show = (which, autoRun = false) =>
+    ({ browse: renderBrowse, tail: renderTail, produce: renderProduce })[which](panel, topicSelect, () => partitionCount, autoRun);
 
   view.querySelector('#ex-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
     if (!btn) return;
     view.querySelectorAll('#ex-tabs .btn').forEach((b) => b.classList.toggle('primary', b === btn));
-    show(btn.dataset.tab);
+    currentTab = btn.dataset.tab;
+    syncUrl();
+    show(currentTab);
   });
 
   topicSelect.addEventListener('change', () => {
     partitionCount = topicOptions.find((t) => t.name === topicSelect.value)?.partitions ?? 1;
+    syncUrl();
+    show(currentTab); // rebuild panel: fresh partition options, results from the old topic cleared
   });
 
-  await show(tab);
+  await show(tab, Boolean(query.topic));
 }
 
 function partitionOptions(count, selected) {
@@ -64,7 +74,7 @@ function partitionOptions(count, selected) {
 
 let producePrefill = null; // set by "Reproduce" → consumed by the produce tab
 
-function renderBrowse(panel, topicSelect, getPartitions) {
+function renderBrowse(panel, topicSelect, getPartitions, autoRun = false) {
   let all = []; // accumulated across "Load more"
   const lastOffsets = {}; // partition -> last seen offset + 1
   let reachedEnd = false;
@@ -101,6 +111,16 @@ function renderBrowse(panel, topicSelect, getPartitions) {
   panel.querySelector('#br-go').addEventListener('click', () => runBrowse());
   panel.querySelector('#br-limit').addEventListener('keydown', (e) => { if (e.key === 'Enter') runBrowse(); });
 
+  // arriving from "explore" (or any deep link) should show data, not an empty panel
+  if (autoRun) runBrowse();
+  // keyboard activation for message rows (delegated — survives re-renders)
+  panel.querySelector('#br-results').addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-msg]')) {
+      e.preventDefault();
+      e.target.click();
+    }
+  });
+
   function renderResults() {
     const results = panel.querySelector('#br-results');
     results.innerHTML = all.length === 0
@@ -108,7 +128,7 @@ function renderBrowse(panel, topicSelect, getPartitions) {
       : `<div class="table-wrap"><table class="tbl msg-table">
           <thead><tr><th class="num">Partition</th><th class="num">Offset</th><th>Time</th><th>Key</th><th>Value</th><th></th></tr></thead>
           <tbody>${all.map((m, i) => `
-            <tr class="clickable" data-msg="${i}">
+            <tr class="clickable" tabindex="0" data-msg="${i}">
               <td class="num">${m.partition}</td>
               <td class="num mono">${m.offset}</td>
               <td class="small muted">${fmtRel(m.timestamp)}</td>
@@ -403,7 +423,8 @@ async function renderProduce(panel, topicSelect) {
         <div class="field"><label>Headers <span class="hint">(JSON object, optional)</span></label>
           <textarea id="pr-headers" rows="2" placeholder='{"trace-id": "abc"}'></textarea></div>
         <div class="field"><label>Value</label>
-          <textarea id="pr-value" rows="8" placeholder='{"amount": 42.0, "currency": "EUR"}'></textarea></div>
+          <textarea id="pr-value" rows="8" placeholder='{"amount": 42.0, "currency": "EUR"}'></textarea>
+          <div class="hint" id="pr-json-hint"></div></div>
         <div class="btn-row">
           <button class="btn primary" id="pr-send">Send message</button>
           <span class="muted small">Ctrl+Enter to send</span>
@@ -433,6 +454,19 @@ async function renderProduce(panel, topicSelect) {
   }
 
   const valueBox = panel.querySelector('#pr-value');
+  const jsonHint = panel.querySelector('#pr-json-hint');
+  valueBox.addEventListener('input', debounce(() => {
+    const v = valueBox.value.trim();
+    if (v === '') { jsonHint.textContent = ''; return; }
+    try {
+      JSON.parse(v);
+      jsonHint.textContent = '✓ valid JSON';
+      jsonHint.style.color = 'var(--ok)';
+    } catch (e) {
+      jsonHint.textContent = '✗ invalid JSON — ' + e.message;
+      jsonHint.style.color = 'var(--err)';
+    }
+  }, 250));
   const history = [];
   let schemaMode = false;
   let subjects = [];

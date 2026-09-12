@@ -43,9 +43,18 @@ export function badge(text, tone = 'neutral') {
 
 /** Shimmering placeholder rows shown while a view loads. cols: [flex, flex, ...] grid template. */
 export function skeletonTable(rows = 6, cols = 5) {
-  const row = `<div class="skeleton-row" style="grid-template-columns:repeat(${cols}, 1fr)">` +
+  const row = `<div class="skeleton-row" aria-hidden="true" style="grid-template-columns:repeat(${cols}, 1fr)">` +
     Array.from({ length: cols }, () => '<div class="skeleton"></div>').join('') + '</div>';
-  return `<div>${row.repeat(rows)}</div>`;
+  return `<div aria-busy="true">${row.repeat(rows)}</div>`;
+}
+
+/** Make a click target (table row, card) keyboard-activatable: Tab to it, Enter/Space clicks. */
+export function focusable(el) {
+  if (!el) return;
+  el.setAttribute('tabindex', '0');
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+  });
 }
 
 export async function copyText(text, label = 'Copied to clipboard') {
@@ -118,6 +127,8 @@ export function toast(message, type = 'ok', ms = 4200) {
 // ---- modal ----
 export function modal({ title, body, wide = false, onMount, actions = [] }) {
   const root = document.getElementById('modal-root');
+  root.querySelectorAll('.modal-overlay').forEach((o) => o.remove()); // never stack modals
+  const lastFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -128,8 +139,16 @@ export function modal({ title, body, wide = false, onMount, actions = [] }) {
         ${actions.map((a, i) => `<button class="btn ${a.class || ''}" data-action="${i}">${esc(a.label)}</button>`).join('')}
       </div>
     </div>`;
-  const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); lastFocus?.focus?.(); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key !== 'Tab') return;
+    const focusables = overlay.querySelectorAll('button, input, select, textarea, a[href]');
+    if (focusables.length === 0) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+  };
   document.addEventListener('keydown', onKey);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   actions.forEach((a, i) => {
@@ -137,6 +156,7 @@ export function modal({ title, body, wide = false, onMount, actions = [] }) {
   });
   root.appendChild(overlay);
   onMount?.(overlay, close);
+  (overlay.querySelector('input, select, textarea') || overlay.querySelector('button'))?.focus();
   return close;
 }
 
