@@ -79,7 +79,8 @@ const fmtTs = (t) => t === undefined || t === null ? '' :
 function msgLine(m) {
   const hasDecoded = m.schema && m.schema.decoded !== undefined && m.schema.decoded !== null;
   const val = hasDecoded ? oneLine(JSON.stringify(m.schema.decoded))
-    : m.binary ? `<binary ${m.valueBase64 ? m.valueBase64.length + ' b64 chars' : ''}>` : oneLine(m.value);
+    : m.value ? oneLine(m.value)
+    : m.valueBase64 ? `<binary ${m.valueBase64.length} b64 chars>` : '(empty)';
   const key = m.key === null ? '(null)' : oneLine(m.key, 24);
   const hdr = m.headers && Object.keys(m.headers).length ? ` {${Object.keys(m.headers).length} headers}` : '';
   return `[p${m.partition}@${m.offset}] ${fmtTs(m.timestamp)}  ${key}  ${val}${hdr}`;

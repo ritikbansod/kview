@@ -123,6 +123,63 @@ Point it at another server with `--server http://host:port` (env `KVIEW_URL`)
 and another cluster with `--cluster ID` (env `KVIEW_CLUSTER`). Use `--json`
 for raw output.
 
+## MCP server (AI assistants)
+
+`mcp/kview-mcp.js` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server that exposes Kview as **16 tools** — so Claude Desktop, Cursor, ZCode or
+any MCP client can inspect and operate your Kafka cluster in natural language:
+cluster health, topic inventory, message browsing with filters, producing test
+events, consumer-group lag, broker distribution and partition history.
+
+Zero dependencies — it speaks newline-delimited JSON-RPC over stdio directly.
+Requires Node 18+ and a reachable Kview server.
+
+| Tool | What it does |
+|---|---|
+| `kview_connections` | configured clusters (ids for the other tools) |
+| `kview_overview` | broker/topic/partition KPIs, URP, offline partitions |
+| `kview_brokers` / `kview_broker_distribution` / `kview_broker_partitions` / `kview_broker_configs` | broker inventory, leader/follower balance, per-broker hosting, effective configs |
+| `kview_topics` / `kview_topic_detail` / `kview_topic_history` | topic list, partition+config detail, leader/ISR event history |
+| `kview_topology` | brokers + topics + groups + consumed-by edges in one call |
+| `kview_create_topic` / `kview_delete_topic` | topic management (delete requires `confirm=true`) |
+| `kview_produce` / `kview_browse` | send and read messages (schema payloads decoded automatically) |
+| `kview_consumer_groups` / `kview_consumer_group_detail` | group state, members, per-partition lag |
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json` (Settings → Developer → Edit Config):
+
+```json
+{
+  "mcpServers": {
+    "kview": {
+      "command": "node",
+      "args": ["/absolute/path/to/kview/mcp/kview-mcp.js"],
+      "env": { "KVIEW_URL": "http://localhost:8090" }
+    }
+  }
+}
+```
+
+### Claude Code / ZCode CLI
+
+```bash
+claude mcp add kview -- node /absolute/path/to/kview/mcp/kview-mcp.js
+```
+
+### Cursor / other MCP clients
+
+Any client that supports stdio MCP servers works: command `node`,
+args `["/absolute/path/to/kview/mcp/kview-mcp.js"]`, env `KVIEW_URL`.
+Set `KVIEW_CLUSTER` to change which Kview connection is used when the AI
+doesn't specify one (default `default`).
+
+Verify your setup without a client:
+
+```bash
+node scripts/mcp-smoke-test.mjs   # 25 checks incl. produce → browse round-trip
+```
+
 ## Configuration
 
 | Env var | Default | Meaning |
