@@ -6,6 +6,7 @@ import { renderTopics, renderTopicDetail } from './views/topics.js';
 import { renderExplorer } from './views/explorer.js';
 import { renderGroups, renderGroupDetail } from './views/groups.js';
 import { renderConnections } from './views/connections.js';
+import { renderArchitecture } from './views/architecture.js';
 
 const viewEl = document.getElementById('view');
 const clusterSelect = document.getElementById('cluster-select');
@@ -17,6 +18,7 @@ const routes = [
   { pattern: /^#\/explorer$/, render: (m, query) => renderExplorer(viewEl, query) },
   { pattern: /^#\/groups$/, render: () => renderGroups(viewEl) },
   { pattern: /^#\/groups\/(.+)$/, render: (m) => renderGroupDetail(viewEl, decodeURIComponent(m[1])) },
+  { pattern: /^#\/architecture$/, render: () => renderArchitecture(viewEl) },
   { pattern: /^#\/connections$/, render: () => renderConnections(viewEl) },
 ];
 
@@ -106,8 +108,8 @@ themeBtn.addEventListener('click', () => {
 });
 paintThemeBtn();
 
-// ---- keyboard shortcuts: 1-5 jump between views ----
-const SHORTCUTS = { 1: '#/', 2: '#/topics', 3: '#/explorer', 4: '#/groups', 5: '#/connections' };
+// ---- keyboard shortcuts: 1-6 jump between views ----
+const SHORTCUTS = { 1: '#/', 2: '#/topics', 3: '#/explorer', 4: '#/groups', 5: '#/architecture', 6: '#/connections' };
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const tag = document.activeElement?.tagName;
