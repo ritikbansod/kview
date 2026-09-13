@@ -1,0 +1,12 @@
+# kustomization.yaml
+# Deploy the complete Strimzi KRaft cluster with one command:
+#   kubectl apply -k example/strimzi/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - 00-crds.yaml
+  - 01-strimzi-operator.yaml
+  - 04-keycloak-oauth-mock.yaml
+  - 02-kafka-cluster.yaml
+  - 03-sample-user-topic.yaml

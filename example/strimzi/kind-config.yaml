@@ -1,0 +1,28 @@
+# kind-config.yaml
+# Use this to spin up a Docker-based Kubernetes cluster using Kind (Kubernetes in Docker):
+#   kind create cluster --name kview-test --config example/strimzi/kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Port 9092: PLAINTEXT
+      - containerPort: 9092
+        hostPort: 9092
+        protocol: TCP
+      # Port 9094: External OAuth
+      - containerPort: 9094
+        hostPort: 9094
+        protocol: TCP
+      # Port 9095: External mTLS
+      - containerPort: 9095
+        hostPort: 9095
+        protocol: TCP
+      # Port 8080: Keycloak OIDC
+      - containerPort: 8080
+        hostPort: 8080
+        protocol: TCP
+      # Port 8090: Kview Web UI
+      - containerPort: 8090
+        hostPort: 8090
+        protocol: TCP

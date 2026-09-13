@@ -1,0 +1,104 @@
+###############################################################################
+# 04-keycloak-oauth-mock.yaml
+# Lightweight Keycloak deployment to test the OAuth 2.0 listener (Port 9094/443).
+# Pre-configures:
+#   - Realm: 'kafka'
+#   - Client: 'kview-client' (Client ID: kview-client, Secret: kview-secret)
+#   - Grant Types: client_credentials, password
+###############################################################################
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-config
+  namespace: kafka
+data:
+  kafka-realm.json: |
+    {
+      "realm": "kafka",
+      "enabled": true,
+      "clients": [
+        {
+          "clientId": "kview-client",
+          "enabled": true,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "kview-secret",
+          "serviceAccountsEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "standardFlowEnabled": true,
+          "publicClient": false,
+          "protocol": "openid-connect"
+        }
+      ],
+      "users": [
+        {
+          "username": "service-account-kview-client",
+          "enabled": true,
+          "serviceAccountClientId": "kview-client"
+        }
+      ]
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: kafka
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:24.0.5
+          args: ["start-dev", "--import-realm"]
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: "admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: "admin"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: realm-volume
+              mountPath: /opt/keycloak/data/import
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: realm-volume
+          configMap:
+            name: keycloak-realm-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: kafka
+  labels:
+    app: keycloak
+spec:
+  type: ClusterIP
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
