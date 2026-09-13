@@ -1,4 +1,4 @@
-# QA Report — Kview v2.0
+# QA Report — Kview v1.0
 
 **Date:** 2026-09-06 · **Tester:** automated QA pass (LLM-driven, black-box + white-box)
 **Environment:** Windows 11 · Kafka 4.3.1 (local KRaft, `localhost:9092`) · kview jar on `localhost:8090` · Chrome (in-app browser)

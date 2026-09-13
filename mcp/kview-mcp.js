@@ -17,7 +17,7 @@ import { createInterface } from 'node:readline';
 
 const KVIEW_URL = (process.env.KVIEW_URL || 'http://localhost:8090').replace(/\/+$/, '');
 const DEFAULT_CLUSTER = process.env.KVIEW_CLUSTER || 'default';
-const VERSION = '2.1.0';
+const VERSION = '1.0.0';
 const MAX_VALUE_CHARS = 4000; // per-string truncation inside tool output
 
 function log(msg) {

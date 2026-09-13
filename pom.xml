@@ -13,7 +13,7 @@
 
   <groupId>com.ritikbansod</groupId>
   <artifactId>kview</artifactId>
-  <version>2.0.0</version>
+  <version>1.0.0</version>
   <name>Kview</name>
   <description>Kview: multi-cluster web UI and REST API for Apache Kafka with data explorer, live tail, consumer groups and PLAINTEXT/mTLS/SASL/OAuth support</description>
 

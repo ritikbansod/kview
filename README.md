@@ -2,6 +2,12 @@
   <img src="docs/images/logo.svg" width="72" alt="Kview logo">
 </p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
+  <a href="https://github.com/ritikbansod/kview/actions/workflows/ci.yml"><img src="https://github.com/ritikbansod/kview/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/ritikbansod/kview/releases"><img src="https://img.shields.io/badge/release-v1.0.0-green.svg" alt="Release: v1.0.0"></a>
+</p>
+
 # Kview
 
 A web UI, REST API and CLI for Apache Kafka. Point it at a cluster and browse topics and
@@ -46,20 +52,35 @@ consumer group, so it is safe to point at production topics.
 
 ## Three ways to use it
 
+> [!WARNING]
+> **Network Security:** Kview has no built-in authentication on its REST API and binds to `127.0.0.1` by default. If deploying to a shared server or network, place it behind an authenticating reverse proxy (e.g., OAuth2-Proxy, NGINX, Caddy, Cloudflare Access). See [SECURITY.md](SECURITY.md) for details.
+
 ### 1. Web UI
 
-Build and run (needs Java 21 and Maven):
+**Option A — Docker (recommended):**
+```bash
+# Point at an existing Kafka broker:
+docker run -d -p 8090:8090 -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 ghcr.io/ritikbansod/kview:latest
 
+# Or spin up Kafka broker + Kview together:
+docker compose up -d
 ```
+
+**Option B — Standalone JAR (needs Java 21+):**
+Download `kview-1.0.0.jar` from [Releases](https://github.com/ritikbansod/kview/releases):
+```bash
+java -jar kview-1.0.0.jar
+```
+
+**Option C — Build from source (needs Java 21 and Maven):**
+```bash
 mvn package
-java -jar target/kview-2.0.0.jar
+java -jar target/kview-1.0.0.jar
 ```
 
 Then open http://localhost:8090. It connects to `localhost:9092` by default, set
-`KAFKA_BOOTSTRAP_SERVERS` to point somewhere else. No broker around? `docker-compose.yml`
-in the repo starts a single-node KRaft broker with `docker compose up -d`. The app also
-starts fine when nothing is reachable, pages just say "cluster unreachable" until a
-broker answers.
+`KAFKA_BOOTSTRAP_SERVERS` to point somewhere else. The app also starts fine when
+nothing is reachable — pages just indicate "cluster unreachable" until a broker answers.
 
 The explorer is where you spend most of your time: pick a topic, filter, click a message
 to read it, or tail the topic live.
@@ -157,6 +178,7 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 | Env var | Default | Meaning |
 |---|---|---|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | bootstrap servers of the default cluster |
+| `KVIEW_BIND` | `127.0.0.1` | address to bind to (`0.0.0.0` in Docker container) |
 | `KVIEW_DATA_DIR` | `./data` | where connections.json is stored |
 | `server.port` (application.yml) | `8090` | http port |
 
@@ -169,10 +191,14 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 
 ## Contributing
 
-Bug reports and PRs are welcome. If you want to check compatibility against a
-distribution, `node scripts/verify-compatibility.mjs` re-runs the whole verification
-matrix against a local broker, see COMPATIBILITY.md for what it covers.
+Bug reports, suggestions, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for development guidelines. If you want to check compatibility against a distribution,
+`node scripts/verify-compatibility.mjs` re-runs the verification matrix against a local broker.
 
 ## License
 
-TODO: pick a license before the first public release, probably Apache-2.0.
+This project is licensed under the [Apache License, Version 2.0](LICENSE).
+
+## Trademarks
+
+Apache®, Apache Kafka®, Kafka®, and the Apache feather logo are trademarks or registered trademarks of the Apache Software Foundation in the United States and/or other countries. Kview is an independent open-source project and is not affiliated with, endorsed by, or sponsored by the Apache Software Foundation. All other trademarks, service marks, and company names (such as Confluent, Redpanda, Strimzi, AWS, Azure) are the property of their respective owners.

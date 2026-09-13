@@ -4,7 +4,7 @@
  * Dependency-free; needs Node 18+. Works against local or remote Kview instances:
  *   node cli/kview.mjs <command> [args] [--server URL] [--cluster ID] [--json]
  */
-const VERSION = '2.0.0';
+const VERSION = '1.0.0';
 
 const argv = process.argv.slice(2);
 
