@@ -236,13 +236,14 @@ In the **Kview Web UI** (`Connections -> Add cluster`):
    - Hostname Verification: OFF
 
 3. **OAuth 2.0 (Port 9094):**
-   - Bootstrap: `localhost:9094`
+   - Bootstrap: `<bootstrap-address>:9094` (or NodePort e.g. `localhost:30251`)
    - Protocol: `SASL_SSL`
    - SASL Mechanism: `OAUTHBEARER`
-   - Token Endpoint URL: `http://localhost:8080/realms/kafka/protocol/openid-connect/token`
+   - Token Endpoint URL: `http://<keycloak-host>:8080/realms/kafka/protocol/openid-connect/token`
    - Client ID: `kview-client`
    - Client Secret: `kview-secret`
-   - CA Certificate: Paste contents of `ca.crt`
+   - CA Certificate: Paste contents of `ca.crt` (one-way TLS)
+   - Hostname Verification: **OFF** (required when connecting via external IP / localhost with Strimzi self-signed internal SANs)
 
 ---
 

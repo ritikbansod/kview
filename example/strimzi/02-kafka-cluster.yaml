@@ -122,7 +122,7 @@ spec:
       # Validates JWT tokens against Keycloak or any OIDC-compliant Identity Provider
       - name: oauth
         port: 9094
-        type: loadbalancer
+        type: nodeport
         tls: true
         authentication:
           type: custom
@@ -132,16 +132,16 @@ spec:
             oauthbearer.sasl.server.callback.handler.class: io.strimzi.kafka.oauth.server.JaasServerOauthValidatorCallbackHandler
             oauthbearer.sasl.jaas.config: |
               org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required
-                oauth.valid.issuer.uri="http://keycloak.kafka.svc.cluster.local:8080/realms/kafka"
+                oauth.check.issuer="false"
                 oauth.jwks.endpoint.uri="http://keycloak.kafka.svc.cluster.local:8080/realms/kafka/protocol/openid-connect/certs"
                 oauth.username.claim="preferred_username";
             connections.max.reauth.ms: 3600
 
       # [4] Port 9095: External mTLS
-      # Exposes mTLS to clients outside Kubernetes via LoadBalancer / NodePort
+      # Exposes mTLS to clients outside Kubernetes via NodePort
       - name: extmtls
         port: 9095
-        type: loadbalancer
+        type: nodeport
         tls: true
         authentication:
           type: tls

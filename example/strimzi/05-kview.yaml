@@ -1,0 +1,81 @@
+###############################################################################
+# 05-kview.yaml
+# Deploy Kview Web UI inside Kubernetes, pointing directly to the Strimzi Kafka cluster.
+###############################################################################
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kview
+  namespace: kafka
+  labels:
+    app: kview
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kview
+  template:
+    metadata:
+      labels:
+        app: kview
+    spec:
+      containers:
+        - name: kview
+          image: ghcr.io/ritikbansod/kview:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kview-cluster-kafka-bootstrap.kafka.svc:9092"
+            - name: KVIEW_BIND
+              value: "0.0.0.0"
+            - name: KVIEW_DATA_DIR
+              value: "/app/data"
+          volumeMounts:
+            - name: kview-data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: kview-data
+          persistentVolumeClaim:
+            claimName: kview-data-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kview-data-pvc
+  namespace: kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kview
+  namespace: kafka
+  labels:
+    app: kview
+spec:
+  # In Docker Desktop Kubernetes, LoadBalancer automatically maps to localhost:8090
+  type: LoadBalancer
+  selector:
+    app: kview
+  ports:
+    - name: http
+      port: 8090
+      targetPort: 8090

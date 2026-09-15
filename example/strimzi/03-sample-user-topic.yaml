@@ -8,7 +8,7 @@
 # -----------------------------------------------------------------------------
 # Sample Kafka Topic
 # -----------------------------------------------------------------------------
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: test-topic
@@ -30,7 +30,7 @@ spec:
 #   - User Private Key: user.key
 # Stored in Secret: 'test-mtls-user' in the 'kafka' namespace.
 # -----------------------------------------------------------------------------
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaUser
 metadata:
   name: test-mtls-user
@@ -48,17 +48,20 @@ spec:
           type: topic
           name: "*"
           patternType: literal
-        operation: All
+        operations:
+          - All
         host: "*"
       # Allow consumer group coordination
       - resource:
           type: group
           name: "*"
           patternType: literal
-        operation: All
+        operations:
+          - All
         host: "*"
       # Allow cluster-level operations
       - resource:
           type: cluster
-        operation: Describe
+        operations:
+          - Describe
         host: "*"

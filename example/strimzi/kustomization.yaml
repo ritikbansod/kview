@@ -10,3 +10,4 @@ resources:
   - 04-keycloak-oauth-mock.yaml
   - 02-kafka-cluster.yaml
   - 03-sample-user-topic.yaml
+  - 05-kview.yaml
