@@ -136,6 +136,14 @@ document.addEventListener('keydown', (e) => {
   if (SHORTCUTS[e.key]) location.hash = SHORTCUTS[e.key];
 });
 
+// ---- read-only awareness (server can run with KVIEW_READONLY=true) ----
+fetch('/api/meta').then((r) => r.json()).then((meta) => {
+  if (meta.readonly) {
+    const banner = document.getElementById('readonly-banner');
+    if (banner) banner.hidden = false;
+  }
+}).catch(() => { /* meta is best-effort */ });
+
 loadClusters().then(render).catch((err) => {
   document.getElementById('view').innerHTML =
     `<h1>Backend unreachable</h1><div class="error-panel">${esc(err.message || err)}</div>

@@ -15,7 +15,7 @@ export function setToken(token) {
 }
 
 function headers(body) {
-  const h = {};
+  const h = { 'X-Kview-Client': 'kview-ui' };
   const token = getToken();
   if (token) h.Authorization = `Bearer ${token}`;
   if (body !== undefined) h['Content-Type'] = 'application/json';

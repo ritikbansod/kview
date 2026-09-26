@@ -665,3 +665,12 @@ tr[tabindex]:focus-visible, .pcard:focus-visible {
 button.arch-broker-chip { font: inherit; color: var(--text); background: var(--panel); }
 button.arch-broker-chip:hover { border-color: var(--accent); }
 .arch-broker-chip.is-active { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-soft); }
+
+/* read-only mode banner (KVIEW_READONLY=true) */
+.readonly-banner {
+  background: #b45309;
+  color: #ffffff;
+  padding: 6px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+}

@@ -19,6 +19,8 @@ import { createInterface } from 'node:readline';
 const KVIEW_URL = (process.env.KVIEW_URL || 'http://localhost:8090').replace(/\/+$/, '');
 const DEFAULT_CLUSTER = process.env.KVIEW_CLUSTER || 'default';
 const TOKEN = process.env.KVIEW_TOKEN || '';
+// optional per-tool allowlist: KVIEW_ALLOWED_TOOLS="kview_overview,kview_browse" — only these tools are served
+const ALLOWED_TOOLS = (process.env.KVIEW_ALLOWED_TOOLS || '').split(',').map((s) => s.trim()).filter(Boolean);
 const VERSION = '1.0.0';
 const MAX_VALUE_CHARS = 4000; // per-string truncation inside tool output
 
@@ -35,6 +37,7 @@ async function api(path, options = {}) {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'X-Kview-Client': `kview-mcp/${VERSION}`,
         ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
         ...(options.headers || {}),
       },
@@ -324,6 +327,11 @@ const TOOLS = [
   },
 ];
 
+// when an allowlist is set, only those tools exist for the client
+const SERVED_TOOLS = ALLOWED_TOOLS.length
+  ? TOOLS.filter((t) => ALLOWED_TOOLS.includes(t.name))
+  : TOOLS;
+
 // ---- MCP protocol plumbing (JSON-RPC 2.0 over stdio, NDJSON framing) ---
 
 function send(obj) {
@@ -343,10 +351,14 @@ async function dispatch(method, params = {}) {
         serverInfo: { name: 'kview', title: 'Kview — Apache Kafka MCP', version: VERSION },
       };
     case 'tools/list':
-      return { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) };
+      return { tools: SERVED_TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) };
     case 'tools/call': {
-      const tool = TOOLS.find((t) => t.name === params.name);
-      if (!tool) return toolResult(`Unknown tool: ${params.name}`, true);
+      const tool = SERVED_TOOLS.find((t) => t.name === params.name);
+      if (!tool) {
+        return toolResult(ALLOWED_TOOLS.length
+          ? `Tool not allowed. Enabled tools: ${SERVED_TOOLS.map((t) => t.name).join(', ')}`
+          : `Unknown tool: ${params.name}`, true);
+      }
       try {
         const data = await tool.run(params.arguments || {});
         return toolResult(JSON.stringify(slim(data), null, 2));
@@ -394,4 +406,5 @@ rl.on('line', (line) => {
 });
 rl.on('close', () => process.exit(0));
 
-log(`kview MCP server ready — REST base ${KVIEW_URL}, default cluster "${DEFAULT_CLUSTER}", ${TOOLS.length} tools`);
+log(`kview MCP server ready — REST base ${KVIEW_URL}, default cluster "${DEFAULT_CLUSTER}", ` +
+  `${SERVED_TOOLS.length} tools${ALLOWED_TOOLS.length ? ` (allowlist: ${ALLOWED_TOOLS.join(', ')})` : ''}`);

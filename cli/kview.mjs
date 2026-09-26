@@ -34,7 +34,10 @@ const clusterPath = (suffix = '') => `/api/clusters/${encodeURIComponent(CLUSTER
 
 // API bearer token: --token flag or KVIEW_TOKEN (needed when the server runs with kview.auth.mode != none)
 const TOKEN = typeof flags.token === 'string' && flags.token ? flags.token : (process.env.KVIEW_TOKEN || '');
-const authHeaders = () => (TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {});
+const authHeaders = () => ({
+  'X-Kview-Client': `kview-cli/${VERSION}`,
+  ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+});
 
 async function api(method, path, body) {
   let res;

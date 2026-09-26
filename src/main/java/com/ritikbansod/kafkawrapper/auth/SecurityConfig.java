@@ -1,11 +1,13 @@
 package com.ritikbansod.kafkawrapper.auth;
 
-import jakarta.servlet.http.HttpServletRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -24,14 +26,10 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.RequestMatcher;
-import org.springframework.util.AntPathMatcher;
-import org.springframework.util.PathMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -51,9 +49,6 @@ import java.util.List;
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
-
-    /** POST endpoints that read, not mutate — a read-only role may call these. */
-    private static final List<String> READ_SHAPED_POSTS = List.of("/**/browse", "/**/decode", "/**/encode", "/**/test");
 
     private final AuthProperties auth;
 
@@ -80,9 +75,10 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(a -> a
                         .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/favicon.ico", "/error",
-                                "/actuator/health").permitAll()
+                                "/api/meta", "/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").hasAnyRole("ADMIN", "READONLY")
-                        .requestMatchers(MutationMatcher.INSTANCE).hasRole("ADMIN")
+                        .requestMatchers(MutationRequests.INSTANCE)
+                        .hasRole("ADMIN")
                         .requestMatchers("/api/**").hasAnyRole("ADMIN", "READONLY")
                         .anyRequest().permitAll())
                 .exceptionHandling(e -> e
@@ -141,50 +137,40 @@ public class SecurityConfig {
         } else {
             // authenticated: no wildcard — opt in per origin
             config.setAllowedOrigins(auth.allowedOrigins());
-            config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+            config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Kview-Client"));
         }
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
         return source;
     }
 
-    /** Mutations under /api: every non-GET except the read-shaped POSTs (browse, decode, encode, test). */
-    static final class MutationMatcher implements RequestMatcher {
+    /** Global read-only mode (kview.readonly=true): mutations rejected before anything else runs. */
+    @Bean
+    @ConditionalOnProperty(name = "kview.readonly", havingValue = "true")
+    public FilterRegistrationBean<ReadOnlyModeFilter> readOnlyModeFilter() {
+        FilterRegistrationBean<ReadOnlyModeFilter> bean = new FilterRegistrationBean<>(new ReadOnlyModeFilter());
+        bean.setOrder(-110); // ahead of the security chain (-100): the reason is "read-only", not "unauthorized"
+        return bean;
+    }
 
-        static final MutationMatcher INSTANCE = new MutationMatcher();
-        private static final PathMatcher ANT = new AntPathMatcher();
-
-        @Override
-        public boolean matches(HttpServletRequest request) {
-            String method = request.getMethod();
-            if ("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method)
-                    || "OPTIONS".equalsIgnoreCase(method)) {
-                return false;
-            }
-            String path = request.getRequestURI();
-            if (!path.startsWith("/api/")) return false;
-            if (!"POST".equalsIgnoreCase(method)) return true;
-            return READ_SHAPED_POSTS.stream().noneMatch(pattern -> ANT.match(pattern, path));
-        }
+    /** Append-only JSONL audit trail (kview.audit=true) — one line per mutation request. */
+    @Bean
+    @ConditionalOnProperty(name = "kview.audit", havingValue = "true")
+    public FilterRegistrationBean<AuditFilter> auditFilter(
+            @Value("${kview.data-dir:./data}") String dataDir, ObjectMapper mapper) {
+        FilterRegistrationBean<AuditFilter> bean = new FilterRegistrationBean<>(new AuditFilter(dataDir, mapper));
+        bean.setOrder(10); // outside the security chain, so the final response status is recorded
+        return bean;
     }
 
     private static org.springframework.security.web.AuthenticationEntryPoint jsonEntryPoint() {
-        return (request, response, authException) -> writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
+        return (request, response, authException) -> JsonError.write(response, HttpServletResponse.SC_UNAUTHORIZED,
                 "unauthorized", "Authentication required — send 'Authorization: Bearer <token>' "
                         + "(see the Authentication section in the README).");
     }
 
     private static org.springframework.security.web.access.AccessDeniedHandler jsonDeniedHandler() {
-        return (request, response, accessDeniedException) -> writeJson(response, HttpServletResponse.SC_FORBIDDEN,
+        return (request, response, accessDeniedException) -> JsonError.write(response, HttpServletResponse.SC_FORBIDDEN,
                 "forbidden", "This operation requires the admin role.");
-    }
-
-    private static void writeJson(HttpServletResponse response, int status, String error, String detail)
-            throws IOException {
-        response.setStatus(status);
-        response.setHeader("WWW-Authenticate", "Bearer");
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"error\":\"" + error + "\",\"detail\":\"" + detail + "\"}");
     }
 }
