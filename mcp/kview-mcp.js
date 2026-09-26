@@ -174,6 +174,37 @@ const impl = {
     return api(`/api/clusters/${cluster(p)}/groups`);
   },
 
+  async search(p) {
+    const topic = requireArg(p, 'topic');
+    const body = {};
+    for (const k of ['keyContains', 'valueContains', 'valueRegex']) {
+      if (p[k] !== undefined) body[k] = String(p[k]);
+    }
+    for (const k of ['fromTs', 'toTs']) {
+      if (p[k] !== undefined) body[k] = Number(p[k]);
+    }
+    if (p.limit !== undefined) body.limit = Math.min(Number(p.limit) || 100, 1000);
+    if (p.partition !== undefined) body.partition = Number(p.partition);
+    const { searchId } = await api(`/api/clusters/${cluster(p)}/topics/${encodeURIComponent(topic)}/search`,
+      { method: 'POST', body: JSON.stringify(body) });
+    const maxWaitMs = Math.min(Number(p.maxWaitMs) || 15000, 60000);
+    const deadline = Date.now() + maxWaitMs;
+    let status;
+    do {
+      await new Promise((r) => setTimeout(r, 400));
+      status = await api(`/api/clusters/${cluster(p)}/searches/${searchId}`);
+    } while (status.state === 'RUNNING' && Date.now() < deadline);
+    if (status.state === 'RUNNING') {
+      status.note = `Still running (scanned ${status.scanned} so far) — poll with kview_search_status(searchId='${searchId}')`;
+    }
+    return status;
+  },
+
+  async searchStatus(p) {
+    const searchId = requireArg(p, 'searchId');
+    return api(`/api/clusters/${cluster(p)}/searches/${searchId}`);
+  },
+
   async groupDetail(p) {
     const group = requireArg(p, 'group');
     return api(`/api/clusters/${cluster(p)}/groups/${encodeURIComponent(group)}`);
@@ -309,6 +340,32 @@ const TOOLS = [
       cluster: str('Kview connection id (optional)'),
     }, ['topic']),
     run: impl.browse,
+  },
+  {
+    name: 'kview_search_messages',
+    description: 'Search a whole topic (all partitions, background job) for messages matching text or regex filters, optionally bounded by timestamps. Waits up to maxWaitMs for completion and returns matches with progress. Read-only.',
+    inputSchema: object({
+      topic: str('Topic name'),
+      valueRegex: str('Regular expression the value must match, e.g. "orderId"\\s*:\\s*"ORD-[0-9]+" (optional)'),
+      valueContains: str('Only messages whose value contains this text (optional)'),
+      keyContains: str('Only messages whose key contains this text (optional)'),
+      fromTs: num('Epoch-ms lower timestamp bound (inclusive, optional)'),
+      toTs: num('Epoch-ms upper timestamp bound (exclusive, optional)'),
+      limit: num('Max matches to collect (default 100, max 1000)'),
+      partition: num('Restrict to one partition (optional)'),
+      maxWaitMs: num('How long to wait for completion, ms (default 15000, max 60000)'),
+      cluster: str('Kview connection id (optional)'),
+    }, ['topic']),
+    run: impl.search,
+  },
+  {
+    name: 'kview_search_status',
+    description: 'Progress and results of a background search started with kview_search_messages (searchId is in its output).',
+    inputSchema: object({
+      searchId: str('Search id from kview_search_messages'),
+      cluster: str('Kview connection id (optional)'),
+    }, ['searchId']),
+    run: impl.searchStatus,
   },
   {
     name: 'kview_consumer_groups',

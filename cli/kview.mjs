@@ -64,6 +64,17 @@ function fail(msg) {
   process.exit(1);
 }
 
+/** Starts are async: poll the search until done or the wait budget runs out. */
+async function pollSearch(searchId, waitSec) {
+  const deadline = Date.now() + waitSec * 1000;
+  let status;
+  do {
+    status = await api('GET', clusterPath(`/searches/${encodeURIComponent(searchId)}`));
+    if (status.state === 'RUNNING') await new Promise((r) => setTimeout(r, 500));
+  } while (status.state === 'RUNNING' && Date.now() < deadline);
+  return status;
+}
+
 // ---- output helpers ----------------------------------------------------------
 const oneLine = (s, max = 70) =>
   s === null || s === undefined ? '' :
@@ -111,6 +122,9 @@ Topics:    topics | topic <name> | topic-create <name> [--partitions N] [--rf N]
 Messages:  produce <topic> [-k key] [-v payload] [--file path] [--partition N] [--header k=v...]
            browse <topic> [--start latest|earliest|timestamp] [--limit N] [--partition N]
                   [--key-contains S] [--value-contains S] [--ts 2026-01-01T10:00:00Z]
+           search <topic> [--value-regex RE] [--key-contains S] [--value-contains S]
+                  [--from-ts MS|ISO] [--to-ts MS|ISO] [--limit N] [--partition N] [--wait SEC]
+           search-status <searchId>
            tail <topic> [--from latest|earliest] [--partition N]     (Ctrl+C stops)
 Groups:    groups | lag <group> | reset-offsets <group> --topic T --mode earliest|latest|offset|timestamp
            [--value V] | group-delete <group>
@@ -225,6 +239,34 @@ Examples:  kview overview
     for (const m of out.messages ?? []) console.log(msgLine(m) + decodedSuffix(m));
     console.error(`-- ${out.messages?.length ?? 0} message(s) from ${topic}` +
       (out.reachedEnd ? ' (end of partition reached)' : ' (older messages may exist — raise --limit)'));
+  },
+
+  async search() {
+    const topic = positional[1] ?? fail('usage: kview search <topic> [--value-regex RE] [--key-contains S] [--value-contains S] [--from-ts MS|ISO] [--to-ts MS|ISO] [--limit N] [--partition N] [--wait SEC]');
+    const toMs = (v) => (v === undefined ? undefined : (/^-?\d{13,}$/.test(v) ? Number(v) : Date.parse(v)));
+    const body = {
+      keyContains: flags['key-contains'],
+      valueContains: flags['value-contains'],
+      valueRegex: flags['value-regex'],
+      fromTs: toMs(flags['from-ts']),
+      toTs: toMs(flags['to-ts']),
+      limit: num('limit'),
+      partition: num('partition'),
+    };
+    const { searchId } = await api('POST', clusterPath(`/topics/${encodeURIComponent(topic)}/search`), body);
+    const status = await pollSearch(searchId, num('wait') ?? 60);
+    if (JSON_OUT) { console.log(JSON.stringify(status, null, 2)); return; }
+    for (const m of status.results ?? []) console.log(msgLine(m) + decodedSuffix(m));
+    console.error(`-- ${status.matched} matched · scanned ${status.scanned} · state ${status.state}`
+      + (status.state === 'RUNNING' ? ` — still running, poll with: kview search-status ${searchId}` : '')
+      + (status.limitReached ? ' · limit reached' : ''));
+  },
+
+  async 'search-status'() {
+    const searchId = positional[1] ?? fail('usage: kview search-status <searchId>');
+    const status = await api('GET', clusterPath(`/searches/${encodeURIComponent(searchId)}`));
+    console.log(JSON_OUT ? JSON.stringify(status, null, 2)
+      : `search ${status.searchId}  state=${status.state}  matched=${status.matched}  scanned=${status.scanned}  partitions=${status.partitionsDone}/${status.partitionsTotal}`);
   },
 
   async tail() {

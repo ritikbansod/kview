@@ -42,7 +42,8 @@ consumer group, so it is safe to point at production topics.
 - **Topics**: leaders, replicas, ISR, begin/end offsets, message counts and configs.
   Create and delete topics, increase partitions, edit configs.
 - **Data explorer**: read messages (latest N, exact offsets, from a timestamp, filter by
-  key or value contains), pretty-printed JSON with a copy button, live tail over SSE,
+  key or value contains), whole-topic background search with regex filters and progress,
+  pretty-printed JSON with a copy button, live tail over SSE,
   reproduce a message to any topic with one click.
 - **Produce**: key, value, partition, timestamp and headers, with JSON validation as you type.
 - **Consumer groups**: state, per-partition lag with bars, member assignments, delete a
@@ -116,7 +117,7 @@ scripting. If the server runs with authentication enabled, add `--token <T>` (en
 ### 3. MCP server (AI assistants)
 
 `mcp/kview-mcp.js` is a [Model Context Protocol](https://modelcontextprotocol.io) server
-that exposes Kview as 16 tools, so Claude Desktop, Cursor, ZCode or any MCP client can
+that exposes Kview as 18 tools, so Claude Desktop, Cursor, ZCode or any MCP client can
 inspect and operate your Kafka cluster in natural language: cluster health, topic
 inventory, message browsing with filters, producing test events, consumer-group lag and
 broker distribution. Zero dependencies, speaks newline-delimited JSON-RPC over stdio.
