@@ -64,6 +64,7 @@ public class SchemaRegistryService {
     private final RegistrySettingsStore settingsStore;
     private final ObjectMapper mapper = new ObjectMapper();
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Object> keyLocks = new ConcurrentHashMap<>();
 
     public SchemaRegistryService(List<SchemaRegistryAdapter> adapters,
                                  ConfluentSchemaRegistryAdapter confluentAdapter,
@@ -209,7 +210,9 @@ public class SchemaRegistryService {
         if (entry != null && entry.expiresAtMs() > System.currentTimeMillis()) {
             return (T) entry.value();
         }
-        synchronized (this) {
+        // per-key lock: the loader is a remote registry call (10s timeout), so a
+        // shared lock here would stall decodes for every cluster behind one slow key
+        synchronized (keyLocks.computeIfAbsent(key, k -> new Object())) {
             entry = cache.get(key);
             if (entry != null && entry.expiresAtMs() > System.currentTimeMillis()) {
                 return (T) entry.value();

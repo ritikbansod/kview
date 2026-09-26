@@ -41,3 +41,7 @@ jobs:
         run: |
           node cli/kview.mjs --version
           node cli/kview.mjs --help
+
+      - name: Smoke test MCP server startup (ESM, stdin EOF exits 0)
+        shell: bash
+        run: node mcp/kview-mcp.js < /dev/null

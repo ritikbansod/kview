@@ -25,12 +25,19 @@ jobs:
           java-version: '21'
           cache: 'maven'
 
-      - name: Extract Tag Version
-        id: tag_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Verify tag matches the version in pom.xml, cli and mcp
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          POM_VERSION=$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)
+          if [ "${POM_VERSION}" != "${TAG_VERSION}" ]; then
+            echo "::error::Tag v${TAG_VERSION} does not match pom.xml version ${POM_VERSION} — bump pom.xml before tagging."
+            exit 1
+          fi
+          grep -q "const VERSION = '${TAG_VERSION}'" cli/kview.mjs || { echo "::error::cli/kview.mjs VERSION does not match ${TAG_VERSION}"; exit 1; }
+          grep -q "const VERSION = '${TAG_VERSION}'" mcp/kview-mcp.js || { echo "::error::mcp/kview-mcp.js VERSION does not match ${TAG_VERSION}"; exit 1; }
 
-      - name: Build JAR with Maven
-        run: mvn -B clean package -DskipTests
+      - name: Build JAR with Maven (tests must be green)
+        run: mvn -B clean package
 
       - name: Compute Checksum
         run: |

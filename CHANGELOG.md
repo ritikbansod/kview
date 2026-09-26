@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **MCP server**: `mcp/kview-mcp.js` crashed on startup with `SyntaxError: Cannot use import statement outside a module` on Node ≤ 22.6 (ESM in a `.js` file with no `package.json`) — fixed by shipping `mcp/package.json` with `"type": "module"`.
+- **CLI**: `kview lag <group>` read a non-existent `byTopic` field and silently printed no per-partition lag rows — now reads `partitionsByTopic`, as the API serializes it.
+- **CLI**: `kview clusters` tabled a `securityProtocol` field the API never returns, leaving SECURITY always empty — now derived from the masked `security` object.
+- **Concurrency**: `DynamicConsumerService` had a check-then-act race on subscribe that could leak a permanently running consumer container; subscribe/unsubscribe are now serialized, group buffers are freed when their last subscription ends, and all containers stop on shutdown.
+- **Concurrency**: `RegistrySettingsStore.find()` read a plain `LinkedHashMap` while writers mutated it — now a `ConcurrentHashMap`.
+- **Concurrency**: schema-registry cache loads (remote HTTP, 10s timeout) ran inside one shared lock, so a slow registry stalled decodes cluster-wide — now per-key.
+- **Concurrency**: `KafkaClusterManager.get`/`evict` could hand out a handle that was concurrently being closed — now mutually excluded.
+- **Tests**: integration tests overrode a wrong property name (`kafka-wrapper.data-dir`) and rewrote the developer's real `./data` directory on every run — both suites now point `kview.data-dir` at `target/`.
+
+### Changed
+- Docs: corrected the README `reset-offsets` example; the README roadmap and COMPATIBILITY.md no longer describe the shipped Schema Registry support (Avro/JSON) as unbuilt; internal working documents moved from the repo root to `docs/`.
+- Removed the divergent legacy `kview-cli.js` client; `cli/kview.mjs` is the CLI.
+- CI: the MCP server startup is now smoke-tested on Node 20 (which would have caught the ESM crash), alongside the CLI smoke test.
+- Release: artifacts are built with the test suite green, and a release tag must match the versions in `pom.xml`, `cli/kview.mjs` and `mcp/kview-mcp.js`.
+- Added the Maven wrapper so a clone builds with just a JDK (`./mvnw`).
+
 ## [1.0.0] - 2026-09-13
 
 ### Initial Public Release

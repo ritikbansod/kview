@@ -53,7 +53,7 @@ public class KafkaClusterManager {
                 .orElseThrow(() -> new NoSuchElementException("Unknown cluster id '" + clusterId + "'"));
     }
 
-    public ClusterHandle get(String clusterId) {
+    public synchronized ClusterHandle get(String clusterId) {
         if (DEFAULT_CLUSTER_ID.equals(clusterId)) {
             return getOrCreateDefault();
         }
@@ -84,8 +84,12 @@ public class KafkaClusterManager {
         }
     }
 
-    /** Drops cached clients so the next access reconnects with current profile settings. */
-    public void evict(String clusterId) {
+    /**
+     * Drops cached clients so the next access reconnects with current profile settings.
+     * Synchronized against {@link #get(String)} so a handle is never closed after it
+     * has just been handed to a caller.
+     */
+    public synchronized void evict(String clusterId) {
         ClusterHandle handle = handles.remove(clusterId);
         if (handle != null) {
             log.info("Closed clients for cluster '{}'", clusterId);

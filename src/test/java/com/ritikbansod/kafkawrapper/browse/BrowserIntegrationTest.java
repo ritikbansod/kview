@@ -28,6 +28,8 @@ class BrowserIntegrationTest {
         // set by the EmbeddedKafka KRaft broker before the context refreshes
         registry.add("spring.kafka.bootstrap-servers",
                 () -> System.getProperty("spring.embedded.kafka.brokers"));
+        // keep stores out of the developer's real ./data directory
+        registry.add("kview.data-dir", () -> "target/browser-test-data");
     }
 
 
