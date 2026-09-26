@@ -1,5 +1,5 @@
 // ===== Data Explorer: browse (seek-based), live tail (SSE), produce =====
-import { get, post, clusterPath, loadTopics } from '../api.js';
+import { get, post, clusterPath, loadTopics, getToken } from '../api.js';
 import {
   esc, fmtNum, fmtTs, fmtRel, badge, spinner, toast, modal, jsonBlock, previewValue, copyText, focusable, debounce,
 } from '../ui.js';
@@ -330,6 +330,7 @@ function renderTail(panel, topicSelect, getPartitions) {
     const group = groupInput.value.trim();
     if (group) params.set('groupId', group);
     if (group && commitBox.checked) params.set('autoCommit', 'true');
+    if (getToken()) params.set('access_token', getToken()); // EventSource cannot send headers
 
     rows.innerHTML = '';
     total = 0;

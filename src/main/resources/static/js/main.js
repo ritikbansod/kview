@@ -1,5 +1,5 @@
 // ===== App bootstrap: cluster selector + hash router =====
-import { get, store, setActiveCluster } from './api.js';
+import { get, store, setActiveCluster, getToken, setToken } from './api.js';
 import { esc, protocolBadge } from './ui.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderTopics, renderTopicDetail } from './views/topics.js';
@@ -107,6 +107,24 @@ themeBtn.addEventListener('click', () => {
   paintThemeBtn();
 });
 paintThemeBtn();
+
+// ---- API token (only relevant when the server runs with kview.auth.mode != none) ----
+const authBtn = document.getElementById('auth-btn');
+function paintAuthBtn() {
+  const has = !!getToken();
+  authBtn.textContent = has ? '🔑 Token ✓' : '🔑 Token';
+  authBtn.title = has
+    ? 'API token is set — click to change or clear it'
+    : 'Set the API token (needed when the server runs with authentication enabled)';
+}
+authBtn.addEventListener('click', () => {
+  const entered = prompt('API token for this Kview server (leave empty to clear):', getToken());
+  if (entered === null) return; // cancelled
+  setToken(entered);
+  paintAuthBtn();
+  render(); // re-fetch the current view with the new credentials
+});
+paintAuthBtn();
 
 // ---- keyboard shortcuts: 1-6 jump between views ----
 const SHORTCUTS = { 1: '#/', 2: '#/topics', 3: '#/explorer', 4: '#/groups', 5: '#/architecture', 6: '#/connections' };
