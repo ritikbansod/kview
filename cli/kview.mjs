@@ -125,6 +125,8 @@ Messages:  produce <topic> [-k key] [-v payload] [--file path] [--partition N] [
            search <topic> [--value-regex RE] [--key-contains S] [--value-contains S]
                   [--from-ts MS|ISO] [--to-ts MS|ISO] [--limit N] [--partition N] [--wait SEC]
            search-status <searchId>
+           replay <topic> --to-topic T [--to-cluster ID] [--limit N] [--key-contains S]
+                  [--value-contains S] [--dry-run] [--no-headers]
            tail <topic> [--from latest|earliest] [--partition N]     (Ctrl+C stops)
 Groups:    groups | lag <group> | reset-offsets <group> --topic T --mode earliest|latest|offset|timestamp
            [--value V] | group-delete <group>
@@ -267,6 +269,27 @@ Examples:  kview overview
     const status = await api('GET', clusterPath(`/searches/${encodeURIComponent(searchId)}`));
     console.log(JSON_OUT ? JSON.stringify(status, null, 2)
       : `search ${status.searchId}  state=${status.state}  matched=${status.matched}  scanned=${status.scanned}  partitions=${status.partitionsDone}/${status.partitionsTotal}`);
+  },
+
+  async replay() {
+    const topic = positional[1] ?? fail('usage: kview replay <sourceTopic> --to-topic T [--to-cluster ID] [--limit N] [--key-contains S] [--value-contains S] [--dry-run] [--no-headers]');
+    if (!flags['to-topic']) fail('--to-topic is required');
+    const body = {
+      targetTopic: flags['to-topic'],
+      targetClusterId: flags['to-cluster'],
+      keyContains: flags['key-contains'],
+      valueContains: flags['value-contains'],
+      limit: num('limit'),
+      copyHeaders: !flags['no-headers'],
+      dryRun: Boolean(flags['dry-run']),
+    };
+    const out = await api('POST', clusterPath(`/topics/${encodeURIComponent(topic)}/replay`), body);
+    if (JSON_OUT) { console.log(JSON.stringify(out, null, 2)); return; }
+    console.log(out.dryRun
+      ? `dry run: would copy ${out.selected} message(s) from ${topic} to ${out.targetClusterId}/${out.targetTopic}`
+      : `replayed ${out.copied}/${out.selected} message(s) from ${topic} → ${out.targetClusterId}/${out.targetTopic}`
+        + (out.reachedEnd ? ' (end reached)' : ' (more may remain — raise --limit)'));
+    for (const e of out.errors ?? []) console.error(`error: ${e}`);
   },
 
   async tail() {

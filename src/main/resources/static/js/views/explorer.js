@@ -1,5 +1,5 @@
-// ===== Data Explorer: browse (seek-based), search (whole topic), live tail (SSE), produce =====
-import { get, post, put, del, clusterPath, loadTopics, getToken } from '../api.js';
+// ===== Data Explorer: browse (seek-based), search (whole topic), live tail (SSE), produce, replay =====
+import { get, post, put, del, clusterPath, loadTopics, getToken, store } from '../api.js';
 import {
   esc, fmtNum, fmtTs, fmtRel, badge, spinner, toast, modal, jsonBlock, previewValue, copyText, focusable, debounce,
 } from '../ui.js';
@@ -34,6 +34,7 @@ export async function renderExplorer(view, query = {}) {
       <button class="btn ${tab === 'search' ? 'primary' : 'ghost'}" data-tab="search">Search</button>
       <button class="btn ${tab === 'tail' ? 'primary' : 'ghost'}" data-tab="tail">Live tail</button>
       <button class="btn ${tab === 'produce' ? 'primary' : 'ghost'}" data-tab="produce">Produce</button>
+      <button class="btn ${tab === 'replay' ? 'primary' : 'ghost'}" data-tab="replay">Replay</button>
     </div>
     <div id="ex-panel"></div>`;
 
@@ -48,7 +49,7 @@ export async function renderExplorer(view, query = {}) {
     (currentTab !== 'browse' ? `&tab=${currentTab}` : ''));
 
   const show = (which, autoRun = false) =>
-    ({ browse: renderBrowse, search: renderSearch, tail: renderTail, produce: renderProduce })[which](panel, topicSelect, () => partitionCount, autoRun);
+    ({ browse: renderBrowse, search: renderSearch, tail: renderTail, produce: renderProduce, replay: renderReplay })[which](panel, topicSelect, () => partitionCount, autoRun);
 
   view.querySelector('#ex-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
@@ -370,6 +371,58 @@ function renderSearch(panel, topicSelect, getPartitions) {
       }, 600);
     } catch (err) {
       statusEl.textContent = err.message;
+    }
+  });
+}
+
+// ---------------- Replay (bulk copy to another topic/cluster) ----------------
+
+function renderReplay(panel, topicSelect) {
+  panel.innerHTML = `
+    <div class="card">
+      <div class="toolbar">
+        <div class="field"><label>Target topic</label><input type="text" id="rp-topic" placeholder="replay-dlq" style="width:170px" /></div>
+        <div class="field"><label>Target cluster</label><select id="rp-cluster">
+          <option value="">same cluster</option>
+          ${store.clusters.filter((c) => c.id !== store.clusterId)
+            .map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}
+        </select></div>
+        <div class="field"><label>Key contains</label><input type="text" id="rp-key" style="width:110px" /></div>
+        <div class="field"><label>Value contains</label><input type="text" id="rp-value" style="width:130px" /></div>
+        <div class="field"><label>Limit</label><input type="number" id="rp-limit" value="500" min="1" max="1000" style="width:80px" /></div>
+        <div class="field"><label class="checkbox"><input type="checkbox" id="rp-headers" checked /> headers</label></div>
+        <div class="field"><label class="checkbox"><input type="checkbox" id="rp-dry" /> dry run</label></div>
+        <div class="field"><label>&nbsp;</label><button class="btn primary" id="rp-go">Replay</button></div>
+      </div>
+      <div id="rp-status" class="small muted">Copies the selected messages (oldest first, max 1000 per run) to the target with keys, headers and original timestamps preserved. Produces for real — start with a dry run.</div>
+    </div>
+    <div class="card" id="rp-results"><div class="empty-state">Run a replay to see the outcome</div></div>`;
+
+  const statusEl = panel.querySelector('#rp-status');
+  const resultsEl = panel.querySelector('#rp-results');
+
+  panel.querySelector('#rp-go').addEventListener('click', async () => {
+    const topic = topicSelect.value;
+    const body = {
+      targetTopic: panel.querySelector('#rp-topic').value.trim() || null,
+      targetClusterId: panel.querySelector('#rp-cluster').value || null,
+      keyContains: panel.querySelector('#rp-key').value.trim() || null,
+      valueContains: panel.querySelector('#rp-value').value.trim() || null,
+      limit: Number(panel.querySelector('#rp-limit').value) || 500,
+      copyHeaders: panel.querySelector('#rp-headers').checked,
+      dryRun: panel.querySelector('#rp-dry').checked,
+    };
+    try {
+      const out = await post(clusterPath() + `/topics/${encodeURIComponent(topic)}/replay`, body);
+      statusEl.innerHTML = out.dryRun
+        ? `Dry run — <b>${out.selected}</b> message(s) would be copied to <span class="mono">${esc(out.targetClusterId)}/${esc(out.targetTopic)}</span>. Uncheck "dry run" to execute.`
+        : `Replayed <b>${out.copied}</b> of ${out.selected} message(s) → <span class="mono">${esc(out.targetClusterId)}/${esc(out.targetTopic)}</span>` +
+          (out.reachedEnd ? ' · end of topic reached' : ' · more may remain — raise the limit and run again');
+      resultsEl.innerHTML = (out.errors || []).length
+        ? `<div class="error-panel">${out.errors.map(esc).join('<br>')}</div>`
+        : `<div class="empty-state">${out.dryRun ? 'Nothing produced (dry run)' : 'Copy completed'}</div>`;
+    } catch (err) {
+      statusEl.innerHTML = `<div class="error-panel">${esc(err.message)}</div>`;
     }
   });
 }

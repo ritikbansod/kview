@@ -48,6 +48,9 @@ consumer group, so it is safe to point at production topics.
 - **Produce**: key, value, partition, timestamp and headers, with JSON validation as you type.
 - **Consumer groups**: state, per-partition lag with bars, member assignments, delete a
   group, reset offsets (earliest / latest / exact offset / timestamp).
+- **Message replay (DLQ triage)**: bulk-copy filtered messages to another topic — same or
+  another connected cluster — with keys, headers and original timestamps preserved, and a
+  dry-run preview.
 - **Connections**: add, edit, test and reconnect clusters at runtime. Secrets are stored
   server-side and never sent back to the browser.
 
@@ -117,7 +120,7 @@ scripting. If the server runs with authentication enabled, add `--token <T>` (en
 ### 3. MCP server (AI assistants)
 
 `mcp/kview-mcp.js` is a [Model Context Protocol](https://modelcontextprotocol.io) server
-that exposes Kview as 18 tools, so Claude Desktop, Cursor, ZCode or any MCP client can
+that exposes Kview as 19 tools, so Claude Desktop, Cursor, ZCode or any MCP client can
 inspect and operate your Kafka cluster in natural language: cluster health, topic
 inventory, message browsing with filters, producing test events, consumer-group lag and
 broker distribution. Zero dependencies, speaks newline-delimited JSON-RPC over stdio.
@@ -251,7 +254,6 @@ agent's writes are distinguishable from a human's in the audit log.
 
 ## Roadmap
 
-- Message replay: copy a filtered set of messages to another topic or cluster
 - Prometheus metrics for lag and produce rate
 - Protobuf decoding for Schema Registry topics (Avro and JSON Schema shipped)
 

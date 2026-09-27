@@ -205,6 +205,21 @@ const impl = {
     return api(`/api/clusters/${cluster(p)}/searches/${searchId}`);
   },
 
+  async replay(p) {
+    const topic = requireArg(p, 'topic');
+    if (p.confirm !== true) {
+      throw new Error(`Refusing to replay — this produces (duplicating) messages into '${p.targetTopic || topic}'. Preview with dryRun=true first, then pass confirm=true.`);
+    }
+    const body = { dryRun: p.dryRun === true, copyHeaders: p.copyHeaders !== false };
+    if (p.targetTopic !== undefined) body.targetTopic = String(p.targetTopic);
+    if (p.targetCluster !== undefined) body.targetClusterId = String(p.targetCluster);
+    if (p.limit !== undefined) body.limit = Math.min(Number(p.limit) || 500, 1000);
+    if (p.keyContains !== undefined) body.keyContains = String(p.keyContains);
+    if (p.valueContains !== undefined) body.valueContains = String(p.valueContains);
+    return api(`/api/clusters/${cluster(p)}/topics/${encodeURIComponent(topic)}/replay`,
+      { method: 'POST', body: JSON.stringify(body) });
+  },
+
   async groupDetail(p) {
     const group = requireArg(p, 'group');
     return api(`/api/clusters/${cluster(p)}/groups/${encodeURIComponent(group)}`);
@@ -366,6 +381,23 @@ const TOOLS = [
       cluster: str('Kview connection id (optional)'),
     }, ['searchId']),
     run: impl.searchStatus,
+  },
+  {
+    name: 'kview_replay_messages',
+    description: 'Bulk-replay messages from a source topic (e.g. a dead-letter queue) to another topic — same or a different Kview connection — preserving keys, headers and timestamps. Produces to the target: requires confirm=true; use dryRun=true first to preview the selection. Max 1000 per call, oldest first.',
+    inputSchema: object({
+      topic: str('Source topic, e.g. a DLQ'),
+      targetTopic: str('Target topic (default: same topic name)'),
+      targetCluster: str('Target Kview connection id (optional, default: same cluster)'),
+      limit: num('Max messages per call (default 500, max 1000)'),
+      keyContains: str('Only messages whose key contains this text (optional)'),
+      valueContains: str('Only messages whose value contains this text (optional)'),
+      copyHeaders: bool('Preserve headers (default true)'),
+      dryRun: bool('Preview only — select but do not produce (recommended first step)'),
+      confirm: bool('Must be true to actually produce to the target'),
+      cluster: str('Source Kview connection id (optional)'),
+    }, ['topic']),
+    run: impl.replay,
   },
   {
     name: 'kview_consumer_groups',
