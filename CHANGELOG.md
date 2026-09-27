@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tests**: integration tests overrode a wrong property name (`kafka-wrapper.data-dir`) and rewrote the developer's real `./data` directory on every run — both suites now point `kview.data-dir` at `target/`.
 
 ### Changed
+- **Spring Boot 3.3.4 → 3.5.16** (completes the release plan's P2.3 — the 3.3 line is past OSS support end): lifts Spring Framework to 6.2.x, Spring Security to 6.5.x, spring-kafka to 3.3.x, micrometer to 1.15.x and **kafka-clients to 3.9.2**; `KafkaClusterManager` now passes `SslBundles` to the Kafka properties builders, as required by the new builder signatures.
 - Docs: corrected the README `reset-offsets` example; the README roadmap and COMPATIBILITY.md no longer describe the shipped Schema Registry support (Avro/JSON) as unbuilt; internal working documents moved from the repo root to `docs/`.
 - Removed the divergent legacy `kview-cli.js` client; `cli/kview.mjs` is the CLI.
 - CI: the MCP server startup is now smoke-tested on Node 20 (which would have caught the ESM crash), alongside the CLI smoke test.
