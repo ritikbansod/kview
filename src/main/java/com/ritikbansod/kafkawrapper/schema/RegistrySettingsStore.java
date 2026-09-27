@@ -43,6 +43,11 @@ public class RegistrySettingsStore {
         return settings != null && settings.enabled() ? Optional.of(settings) : Optional.empty();
     }
 
+    /** In-memory-only attachment (CLI direct mode) — never persisted to registries.json. */
+    public synchronized void attachVolatile(String clusterId, SchemaRegistrySettings settings) {
+        byCluster.put(clusterId, settings);
+    }
+
     public synchronized void put(String clusterId, SchemaRegistrySettings settings) {
         byCluster.put(clusterId, settings);
         persist();

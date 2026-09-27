@@ -100,6 +100,23 @@ on smaller screens.
 
 ### 2. CLI
 
+Two modes. **Direct mode** (no server) talks to the broker straight from the jar — like
+`kafka-topics.sh`, reusing Kview's services, so browse and search come out schema-decoded:
+
+```bash
+java -jar kview.jar --cli topics --bootstrap-server localhost:9092
+java -jar kview.jar --cli browse orders --start earliest --limit 10
+java -jar kview.jar --cli search orders --value-regex '"orderId"\s*:\s*"ORD-[0-9]+"'
+java -jar kview.jar --cli lag orders-worker --bootstrap-server localhost:9092
+```
+
+`--help` lists every command plus security flags (`--security-protocol`, `--sasl-*`,
+`--truststore-*`, `--oauth-*`) and `--schema-registry URL` for payload decoding. The repo's
+`kview` / `kview.cmd` wrapper scripts pick up the jar next to them, so `kview topics` works
+once the jar is alongside. Every command also takes `--json` for scripting.
+
+**Thin-client mode** (no JVM on your laptop) talks to a running Kview server instead —
+useful from CI or when the server holds the cluster credentials:
 `cli/kview.mjs` is a dependency-free Node 18+ client that talks to a running Kview
 server, local or remote. The same things you do in the UI, from a terminal or a CI script:
 

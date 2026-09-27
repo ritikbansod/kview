@@ -40,6 +40,7 @@ public class KafkaClusterManager {
     private final KafkaProperties springKafkaProperties;
     private final org.springframework.boot.ssl.SslBundles sslBundles;
     private final Map<String, ClusterHandle> handles = new ConcurrentHashMap<>();
+    private final Map<String, ConnectionProfile> adHocProfiles = new ConcurrentHashMap<>();
 
     public KafkaClusterManager(ConnectionStore store, KafkaProperties springKafkaProperties,
                                org.springframework.boot.ssl.SslBundles sslBundles) {
@@ -48,9 +49,19 @@ public class KafkaClusterManager {
         this.sslBundles = sslBundles;
     }
 
+    /** Registers an in-memory profile (CLI direct mode) — it never touches the connection store. */
+    public void registerAdHoc(String clusterId, ConnectionProfile profile) {
+        adHocProfiles.put(clusterId, profile);
+        handles.remove(clusterId); // drop any cached handle from a previous registration
+    }
+
     public ConnectionProfile profileOf(String clusterId) {
         if (DEFAULT_CLUSTER_ID.equals(clusterId)) {
             return builtInProfile();
+        }
+        ConnectionProfile adHoc = adHocProfiles.get(clusterId);
+        if (adHoc != null) {
+            return adHoc;
         }
         return store.find(clusterId)
                 .orElseThrow(() -> new NoSuchElementException("Unknown cluster id '" + clusterId + "'"));
