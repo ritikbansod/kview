@@ -293,6 +293,8 @@ agent's writes are distinguishable from a human's in the audit log.
 Bug reports, suggestions, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
 for development guidelines. If you want to check compatibility against a distribution,
 `node scripts/verify-compatibility.mjs` re-runs the verification matrix against a local broker.
+Maintainers: cutting a release is a version bump + one tag — the full per-channel checklist
+lives in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## License
 
