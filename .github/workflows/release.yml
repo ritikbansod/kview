@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -93,6 +95,22 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Mirror the multi-arch image to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
+          SOURCE="ghcr.io/${{ github.repository }}"
+          TARGET="docker.io/${DOCKERHUB_REPOSITORY}"
+          docker buildx imagetools create \
+            -t "${TARGET}:${VERSION}" \
+            -t "${TARGET}:latest" \
+            "${SOURCE}:${VERSION}"
+          docker logout docker.io
 
   bundles:
     name: Native bundle (${{ matrix.os }})
