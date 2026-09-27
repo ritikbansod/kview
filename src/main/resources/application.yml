@@ -28,12 +28,15 @@ kview:
   # Partition leader/ISR history sampler (per cluster)
   partition-history:
     interval-ms: ${KVIEW_HISTORY_INTERVAL_MS:15000}
+  # Prometheus sampling cadence (metrics are scraped from /actuator/prometheus)
+  metrics:
+    interval-ms: ${KVIEW_METRICS_INTERVAL_MS:15000}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: never

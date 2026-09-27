@@ -1,6 +1,7 @@
 package com.ritikbansod.kafkawrapper.message;
 
 import com.ritikbansod.kafkawrapper.connection.ClusterHandle;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,12 @@ import java.util.concurrent.TimeoutException;
  */
 @Service
 public class ProducerService {
+
+    private final MeterRegistry meterRegistry;
+
+    public ProducerService(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     public Map<String, Object> produce(ClusterHandle handle, String topic, String key, String value,
                                        String valueBase64, Integer partition, Long timestamp,
@@ -45,6 +52,8 @@ public class ProducerService {
         RecordMetadata metadata = handle.template().send(record)
                 .get(15, TimeUnit.SECONDS)
                 .getRecordMetadata();
+        meterRegistry.counter("kview_messages_produced_total",
+                "cluster", handle.profile().id(), "topic", topic).increment();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("topic", metadata.topic());
         result.put("partition", metadata.partition());

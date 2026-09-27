@@ -51,6 +51,10 @@ consumer group, so it is safe to point at production topics.
 - **Message replay (DLQ triage)**: bulk-copy filtered messages to another topic — same or
   another connected cluster — with keys, headers and original timestamps preserved, and a
   dry-run preview.
+- **Prometheus metrics**: `/actuator/prometheus` exposes per-cluster health (topics,
+  partitions, under-replicated and offline partitions, reachability) and per-group
+  consumer lag (`kview_*` series, sampled every 15s so scrapes never block) plus a
+  produced-messages counter — point Grafana at it.
 - **Connections**: add, edit, test and reconnect clusters at runtime. Secrets are stored
   server-side and never sent back to the browser.
 
@@ -191,6 +195,7 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 | `KVIEW_AUTH_ALLOWED_ORIGINS` | — | authenticated modes: browser origins allowed to call the API cross-origin (default: none — CORS is closed) |
 | `KVIEW_READONLY` | `false` | global read-only mode: every mutation is refused, for all clients and roles (UI shows a banner) |
 | `KVIEW_AUDIT` | `false` | append `<data-dir>/audit.log` JSONL line per mutation: who (client), what (method + path), outcome (status) |
+| `KVIEW_METRICS_INTERVAL_MS` | `15000` | sampling cadence for the `kview_*` Prometheus series (`/actuator/prometheus`) |
 | `server.port` (application.yml) | `8090` | http port |
 
 ## Authentication
