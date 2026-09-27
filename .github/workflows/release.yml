@@ -10,10 +10,11 @@ permissions:
   packages: write
 
 jobs:
-  build-and-release:
-    name: Build Jar, Publish Release & Docker Image
+  build:
+    name: Test, build jar, release & Docker
     runs-on: ubuntu-latest
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,6 +27,7 @@ jobs:
           cache: 'maven'
 
       - name: Verify tag matches the version in pom.xml, cli and mcp
+        id: version
         run: |
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
           POM_VERSION=$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)
@@ -35,22 +37,30 @@ jobs:
           fi
           grep -q "const VERSION = '${TAG_VERSION}'" cli/kview.mjs || { echo "::error::cli/kview.mjs VERSION does not match ${TAG_VERSION}"; exit 1; }
           grep -q "const VERSION = '${TAG_VERSION}'" mcp/kview-mcp.js || { echo "::error::mcp/kview-mcp.js VERSION does not match ${TAG_VERSION}"; exit 1; }
+          echo "version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build JAR with Maven (tests must be green)
         run: mvn -B clean package
 
-      - name: Compute Checksum
+      - name: Stage release files
         run: |
-          cd target
-          sha256sum kview-*.jar > checksums.txt
-          cat checksums.txt
+          mkdir stage
+          cp target/kview-*.jar stage/kview.jar
+          sha256sum stage/kview.jar > stage/kview.jar.sha256
+          sha256sum target/kview-*.jar >> stage/kview.jar.sha256
 
-      - name: Create GitHub Release
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar
+          path: stage/*
+
+      - name: Create GitHub Release (jar + checksums)
         uses: softprops/action-gh-release@v2
         with:
           files: |
             target/kview-*.jar
-            target/checksums.txt
+            stage/kview.jar.sha256
           generate_release_notes: true
 
       - name: Set up QEMU
@@ -83,3 +93,193 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  bundles:
+    name: Native bundle (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            pack: tar
+          - os: macos-latest
+            platform: macos-aarch64
+            pack: tar
+          - os: windows-latest
+            platform: windows-x64
+            pack: zip
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (with jpackage)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Download jar
+        uses: actions/download-artifact@v4
+        with:
+          name: jar
+          path: stage
+
+      - name: Create app image with jpackage
+        shell: bash
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          mkdir -p appdir
+          cp stage/kview.jar appdir/kview.jar
+          jpackage \
+            --type app-image \
+            --name kview \
+            --app-version "$VERSION" \
+            --vendor "Kview" \
+            --description "Kview — Apache Kafka UI, CLI and MCP server" \
+            --input appdir \
+            --main-jar kview.jar \
+            --dest dist
+
+      - name: Add the direct-CLI launcher (linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          cp kview dist/kview/bin/kview-cli
+          printf '#!/usr/bin/env sh\nexec "$(cd "$(dirname "$0")" && pwd)/bin/kview" --cli "$@"\n' > dist/kview/kview
+          chmod +x dist/kview/kview dist/kview/bin/kview-cli
+
+      - name: Add the direct-CLI launcher (macos)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          printf '#!/usr/bin/env bash\nexec "$(cd "$(dirname "$0")" && pwd)/kview.app/Contents/MacOS/kview" --cli "$@"\n' > dist/kview/kview
+          chmod +x dist/kview/kview
+
+      - name: Add the direct-CLI launcher (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          @'
+          @echo off
+          set "DIR=%~dp0"
+          "%DIR%kview.exe" --cli %*
+          '@ | Set-Content -Path dist/kview/kview.cmd -Encoding ascii
+
+      - name: Build the deb package (linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          jpackage \
+            --type deb \
+            --name kview \
+            --app-version "$VERSION" \
+            --vendor "Kview" \
+            --description "Kview — Apache Kafka UI, CLI and MCP server" \
+            --input appdir \
+            --main-jar kview.jar \
+            --dest dist-pkg
+
+      - name: Pack the bundle (tar)
+        if: matrix.pack == 'tar'
+        shell: bash
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          tar -czf "kview-${VERSION}-${{ matrix.platform }}.tar.gz" -C dist kview
+
+      - name: Pack the bundle (zip)
+        if: matrix.pack == 'zip'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.build.outputs.version }}"
+          Compress-Archive -Path dist/kview -DestinationPath "kview-$version-${{ matrix.platform }}.zip"
+
+      - name: Checksum the bundle (linux)
+        if: matrix.pack == 'tar' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: sha256sum "kview-${{ needs.build.outputs.version }}-${{ matrix.platform }}.tar.gz" > "kview-${{ needs.build.outputs.version }}-${{ matrix.platform }}.tar.gz.sha256"
+
+      - name: Checksum the bundle (macos)
+        if: matrix.pack == 'tar' && matrix.os == 'macos-latest'
+        shell: bash
+        run: shasum -a 256 "kview-${{ needs.build.outputs.version }}-${{ matrix.platform }}.tar.gz" > "kview-${{ needs.build.outputs.version }}-${{ matrix.platform }}.tar.gz.sha256"
+
+      - name: Checksum the bundle (windows)
+        if: matrix.pack == 'zip'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.build.outputs.version }}"
+          $file = "kview-$version-${{ matrix.platform }}.zip"
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+          "$hash  $file" | Set-Content "$file.sha256"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.platform }}
+          path: |
+            kview-${{ needs.build.outputs.version }}-${{ matrix.platform }}.*
+            dist-pkg/*.deb
+
+  publish:
+    name: Attach bundles, publish npm & Homebrew
+    needs: [build, bundles]
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all bundle artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bundles
+          pattern: bundle-*
+          merge-multiple: true
+
+      - name: Attach bundles to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" bundles/* --clobber
+
+      - name: Publish the npm package
+        if: env.NPM_TOKEN != ''
+        run: |
+          cp -r cli mcp npm/
+          cd npm
+          npm version "${{ needs.build.outputs.version }}" --no-git-tag-version --allow-same-version
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Update the Homebrew tap
+        if: env.HOMEBREW_TAP_TOKEN != ''
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          MAC_SHA256=$(sha256sum "bundles/kview-${VERSION}-macos-aarch64.tar.gz" | cut -d' ' -f1)
+          LINUX_SHA256=$(sha256sum "bundles/kview-${VERSION}-linux-x64.tar.gz" | cut -d' ' -f1)
+          sed -e "s/{{VERSION}}/${VERSION}/g" \
+              -e "s/{{MAC_SHA256}}/${MAC_SHA256}/g" \
+              -e "s/{{LINUX_SHA256}}/${LINUX_SHA256}/g" \
+              packaging/homebrew/kview.rb.tmpl > kview.rb
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${HOMEBREW_TAP_REPO:-ritikbansod/homebrew-kview}.git" tap
+          mkdir -p tap/Formula
+          cp kview.rb tap/Formula/kview.rb
+          cd tap
+          git config user.name "kview-release-bot"
+          git config user.email "noreply@github.com"
+          git add Formula/kview.rb
+          git commit -m "kview ${VERSION}"
+          git push

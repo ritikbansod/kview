@@ -32,6 +32,16 @@ Confluent Platform, Redpanda, Amazon MSK, Azure Event Hubs, Aiven and others. Se
 support covers PLAINTEXT, TLS, mTLS and SASL (PLAIN / SCRAM-SHA-256 / SCRAM-SHA-512 /
 OAUTHBEARER). [COMPATIBILITY.md](COMPATIBILITY.md) has the exact settings per distribution.
 
+## Install
+
+| Channel | Get it | Needs |
+|---|---|---|
+| **JAR** | [Releases](https://github.com/ritikbansod/kview/releases) → `kview.jar` — starts the server UI, or the direct CLI: `java -jar kview.jar --cli topics --bootstrap-server localhost:9092` | Java 21+ |
+| **Native bundles** | Releases → `kview-<v>-linux-x64.tar.gz` / `kview-<v>-macos-aarch64.tar.gz` / `kview-<v>-windows-x64.zip` (also a Linux `.deb`) — bundled JRE, server launcher **and** `kview` CLI | nothing |
+| **npm** | `npm install -g kview` → `kview` (thin client; direct mode when a jar/`KVIEW_JAR` is present) and `npx kview-mcp` | Node 18+ |
+| **Docker** | `docker run -d -p 8090:8090 ghcr.io/ritikbansod/kview:latest` — CLI passthrough: `docker run --rm ghcr.io/ritikbansod/kview --cli topics --bootstrap-server host:9092` | Docker |
+| **Homebrew** | tap `ritikbansod/homebrew-kview`, then `brew install kview` | macOS/Linux |
+
 Browsing and tailing are read-only: Kview never commits offsets and never joins a real
 consumer group, so it is safe to point at production topics.
 

@@ -1,0 +1,43 @@
+class Kview < Formula
+  desc "Apache Kafka UI, CLI and MCP server — direct-mode CLI with a bundled JRE"
+  homepage "https://github.com/ritikbansod/kview"
+  version "{{VERSION}}"
+  license "Apache-2.0"
+
+  on_macos do
+    url "https://github.com/ritikbansod/kview/releases/download/v{{VERSION}}/kview-{{VERSION}}-macos-aarch64.tar.gz"
+    sha256 "{{MAC_SHA256}}"
+  end
+
+  on_linux do
+    url "https://github.com/ritikbansod/kview/releases/download/v{{VERSION}}/kview-{{VERSION}}-linux-x64.tar.gz"
+    sha256 "{{LINUX_SHA256}}"
+  end
+
+  def install
+    libexec.install Dir["*"]
+    launcher = OS.mac? ? libexec/"kview.app/Contents/MacOS/kview" : libexec/"bin/kview"
+
+    (bin/"kview").write <<~EOS
+      #!/bin/bash
+      exec "#{launcher}" --cli "$@"
+    EOS
+
+    (bin/"kview-server").write <<~EOS
+      #!/bin/bash
+      exec "#{launcher}" "$@"
+    EOS
+  end
+
+  def caveats
+    <<~EOS
+      `kview` runs the direct-mode CLI against your brokers (bundled JRE — no Java install needed).
+      `kview-server` starts the Kview web UI on port 8090.
+      A .deb package is also attached to each GitHub release for dpkg-based systems.
+    EOS
+  end
+
+  test do
+    assert_match "kview", shell_output("#{bin}/kview --version")
+  end
+end

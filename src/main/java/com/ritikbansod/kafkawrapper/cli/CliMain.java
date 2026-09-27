@@ -51,6 +51,10 @@ public final class CliMain {
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && (args[0].equals("--version") || args[0].equals("-v"))) {
+            out.println("kview " + version());
+            return 0;
+        }
         if (args.length == 0 || args[0].equals("help") || args[0].equals("--help")) {
             printHelp(out);
             return args.length == 0 ? 2 : 0;
@@ -336,6 +340,12 @@ public final class CliMain {
         Throwable t = e;
         while (t.getCause() != null && t.getCause() != t) t = t.getCause();
         return t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+    }
+
+    private static String version() {
+        Package pkg = CliMain.class.getPackage();
+        return pkg != null && pkg.getImplementationVersion() != null
+                ? pkg.getImplementationVersion() : "dev";
     }
 
     private static void printHelp(PrintStream out) {
