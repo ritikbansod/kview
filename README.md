@@ -259,8 +259,7 @@ agent's writes are distinguishable from a human's in the audit log.
 
 ## Roadmap
 
-- Prometheus metrics for lag and produce rate
-- Protobuf decoding for Schema Registry topics (Avro and JSON Schema shipped)
+- Schema registry browser: version diff, compatibility mode, upload dry-run
 
 ## Contributing
 

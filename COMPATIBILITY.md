@@ -62,7 +62,7 @@ Create the profile in **Connections → Add cluster** (or `POST /api/clusters`).
 | Add-on | Status |
 |---|---|
 | **AWS MSK IAM** | Not built in (requires Amazon's proprietary `aws-msk-iam-auth` SASL mechanism). Extension point: drop the jar in, add a mechanism option mapped to `AWS_MSK_IAM` + its callback handler class. |
-| **Schema Registry (Confluent/Apicurio)** | Shipped in v1.0.0 for Avro and JSON Schema over the Confluent wire format. Protobuf decoding is on the roadmap. |
+| **Schema Registry (Confluent/Apicurio)** | Shipped in v1.0.0 for Avro and JSON Schema over the Confluent wire format; Protobuf decode/encode shipped as well. |
 | **Confluent MDS / RBAC** | Control-plane auth for Confluent tooling — unrelated to the data-plane protocol Kview uses. |
 | **Brokers older than 2.1** | Not supported by modern Apache clients at all (EOL). |
 

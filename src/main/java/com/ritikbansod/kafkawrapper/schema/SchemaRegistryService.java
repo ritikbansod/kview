@@ -2,6 +2,7 @@ package com.ritikbansod.kafkawrapper.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.DynamicMessage;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
@@ -154,6 +155,12 @@ public class SchemaRegistryService {
                     String text = new String(payload, 5, payload.length - 5, StandardCharsets.UTF_8);
                     result.set("decoded", AvroJsonConverter.fromJson(text));
                 }
+                case "PROTO", "PROTOBUF" -> {
+                    var compiled = cached("proto:" + settings.get().url() + ":" + schemaId, AVRO_TTL_MS,
+                            () -> ProtobufCodec.compile(schemaEnvelope.path("schema").asText()));
+                    DynamicMessage message = ProtobufCodec.decodeMessage(compiled, payload);
+                    result.set("decoded", ProtobufCodec.toJson(message));
+                }
                 default -> {
                     result.put("note", "Decoding for '" + schemaType + "' arrives in phase 2 — showing raw payload");
                     result.set("decoded", AvroJsonConverter.fromJson(text(payload)));
@@ -228,13 +235,19 @@ public class SchemaRegistryService {
     public record EncodedPayload(String valueBase64, int schemaId, String subject, int version,
                                  String schemaType, JsonNode normalized) { }
 
+    public EncodedPayload encode(String clusterId, String subject, Integer version, JsonNode payload,
+                                 boolean isKey, boolean dryRun) {
+        return encode(clusterId, subject, version, payload, isKey, dryRun, null);
+    }
+
     /**
-     * Encodes user JSON into the registry's wire format:
-     * AVRO → GenericRecord binary; JSON → validated UTF-8 text. Header: 0x00 + schema id.
+     * Encodes a JSON payload with the subject's schema into registry wire bytes:
+     * AVRO → GenericRecord binary; JSON → validated UTF-8 text; PROTOBUF →
+     * DynamicMessage binary with the Confluent message-index prefix.
      * With {@code dryRun} nothing is returned for producing — the caller inspects the result.
      */
     public EncodedPayload encode(String clusterId, String subject, Integer version, JsonNode payload,
-                                 boolean isKey, boolean dryRun) {
+                                 boolean isKey, boolean dryRun, String messageName) {
         SchemaRegistrySettings settings = requireSettings(clusterId);
         JsonNode envelope = version == null
                 ? confluentAdapter.rawGet(settings, "/subjects/" + enc(subject) + "/versions/latest")
@@ -290,8 +303,19 @@ public class SchemaRegistryService {
                 body = payload.toString().getBytes(StandardCharsets.UTF_8);
                 normalized = payload;
             }
-            case "PROTO" -> throw new IllegalArgumentException(
-                    "Protobuf encoding arrives in phase 2b — not supported yet");
+            case "PROTO", "PROTOBUF" -> {
+                try {
+                    var compiled = cached("proto:" + schemaJson.hashCode(), AVRO_TTL_MS,
+                            () -> ProtobufCodec.compile(schemaJson));
+                    ProtobufCodec.EncodedMessage message = ProtobufCodec.encode(compiled, messageName, payload);
+                    body = message.body();
+                    normalized = message.json();
+                } catch (IllegalArgumentException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("Could not encode the protobuf payload: " + rootMessage(e), e);
+                }
+            }
             default -> throw new IllegalArgumentException("Unsupported schema type '" + schemaType + "'");
         }
 
