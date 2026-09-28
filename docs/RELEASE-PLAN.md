@@ -1,3 +1,10 @@
+> [!ARCHIVE]
+> **This is the v1.0.0 release runbook (2026-09-12), kept for history.** Its items are all
+> closed — license, artifacts, Docker, CI, QA. For cutting a release today, follow
+> [RELEASING.md](RELEASING.md) instead.
+
+---
+
 # Kview — First Public Release Analysis & Runbook
 
 **Date:** 2026-09-12 · **Scope:** what it takes to cut v1 so users can actually *start using* Kview.
