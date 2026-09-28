@@ -7,10 +7,10 @@ Cutting a release is a version bump + one tag; the release workflow does the res
 | Channel | Setup | Notes |
 |---|---|---|
 | Docker (GHCR) | nothing | pushes with `GITHUB_TOKEN` on every tag |
-| Docker Hub | repo secrets `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (a Docker Hub access token), `DOCKERHUB_REPOSITORY` (e.g. `youruser/kview`) | the multi-arch image is **mirrored from GHCR** with `buildx imagetools` — same digests, no rebuild; the step is skipped while the secrets are absent |
+| Docker Hub | repo secrets `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (a Docker Hub access token), `DOCKERHUB_REPOSITORY` (e.g. `ritikbansod2912/kview`) | the multi-arch image is **mirrored from GHCR** with `buildx imagetools` — same digests, no rebuild; the step is skipped while the secrets are absent. `ritikbansod2912/kview:1.0.0` + `:latest` were pushed manually on 2026-09-28 (verified pullable + smoke-tested) |
 | GitHub bundles | nothing | jar + Linux/macOS/Windows jpackage bundles + Linux `.deb` attach to the release |
-| npm | add a repo secret `NPM_TOKEN` (an npm automation token for the `kview` package) | the `Publish the npm package` step is skipped while the secret is absent |
-| Homebrew | create a tap repo (default `ritikbansod/homebrew-kview`) and add repo secrets `HOMEBREW_TAP_TOKEN` (a fine-grained PAT with write access to the tap) and optionally `HOMEBREW_TAP_REPO` | the formula is rendered from `packaging/homebrew/kview.rb.tmpl` and pushed to `tap/Formula/kview.rb` |
+| npm | **deferred to a later release** — activate by adding the repo secret `NPM_TOKEN` (an npm automation token for the `kview` package); the package scaffolding already lives in `npm/` | the `Publish the npm package` step is skipped while the secret is absent |
+| Homebrew | **deferred to a later release** — activate by adding `HOMEBREW_TAP_TOKEN` (+ tap repo, optionally `HOMEBREW_TAP_REPO`); the formula template lives at `packaging/homebrew/kview.rb.tmpl` | the formula-update step is skipped while the secret is absent |
 | SDKMAN | **deferred** — nothing to configure; submit later at https://vendors.sdkman.io (candidate `kview`, version, `https://github.com/ritikbansod/kview/releases/download/vX.Y.Z/kview-X.Y.Z-linux-x64.tar.gz`) if/when there is user demand | manual, one form per release; the release pipeline has no dependency on it |
 
 ## Release checklist
