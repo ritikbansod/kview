@@ -42,7 +42,7 @@ Redpanda, Karapace, Apicurio in compat mode, WarpStream…).
 ## 2. Current-state analysis (why this is needed)
 
 | Area today | Gap |
-|---|---|
+| --- | --- |
 | Browser/tail/produce use `StringDeserializer`/`StringSerializer` | Binary Avro/Protobuf payloads arrive as mojibake; producing schema-encoded data is impossible |
 | No registry concept | Users must decode messages out-of-band (jq + schema-id lookups by hand) |
 | Wire-format headers | The 5-byte Confluent header, 18-byte Glue header, ~36-byte Azure header and Apicurio variants corrupt the first characters of the "string" |
@@ -61,7 +61,7 @@ JSON-Schema.
 ### 3.1 Products and their shapes
 
 | Registry | Vendor | REST API | Formats | Wire format on Kafka | Auth | Notes |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | **Confluent Schema Registry** | Confluent (OSS + Cloud) | `/subjects/{s}/versions/{v}` | Avro, Protobuf, JSON Schema | magic `0x00` + 4-byte schema ID (Protobuf adds message-index array) | none / Basic / OAuth / mTLS | De-facto standard; subject strategies: TopicName/RecordName/TopicRecordName; compatibility modes incl. `_TRANSITIVE` |
 | **Confluent Cloud SR** | Confluent | same as above | same | same | Basic (API key/secret) or OAuth bearer | Same adapter as #1 |
 | **Redpanda Schema Registry** | Redpanda | Confluent-compatible API | Avro, Protobuf, JSON | Confluent-compatible | Basic | Covered by adapter #1 |
@@ -76,7 +76,7 @@ JSON-Schema.
 ### 3.2 Wire-format cheat sheet (what the sniffer must know)
 
 | Magic prefix | Registry family | ID layout |
-|---|---|---|
+| --- | --- | --- |
 | `0x00` + 4B | Confluent-compatible (SR, Cloud, Redpanda, Karapace, Apicurio-compat) | numeric schema/global ID |
 | `0x03` + 1B + 16B UUID | AWS Glue (payload mode) | schema-version UUID |
 | 4B marker + 32B GUID | Azure Schema Registry | schema GUID |
@@ -89,7 +89,7 @@ badge. Never fabricate a decode.
 ### 3.3 Compatibility of semantics
 
 | Capability | Confluent | Apicurio | Glue | Azure |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Compatibility policies (BACKWARD/FORWARD/FULL ± TRANSITIVE) | ✔ | ✔ (per artifact) | ✔ (per registry, coarser) | ✖ (validation-only via Avro) |
 | Subject naming strategies | ✔ 3 built-in | ✔ lookup strategies (topic/record + prefix) | ✖ (schema name) | ✖ (group+name) |
 | References (nested schemas) | ✔ | ✔ (artifact references) | partial | ✖ (Avro-only flat) |
@@ -99,8 +99,8 @@ badge. Never fabricate a decode.
 
 ## 4. Target architecture
 
-```
-┌────────────┐   REST (proxied)   ┌──────────────────────────────┐   adapter   ┌──────────────┐
+```text
+────────────┐   REST (proxied)   ┌──────────────────────────────┐   adapter   ┌──────────────┐
 │  SPA (UI)  │ ─────────────────▶ │  Kview backend             │ ──────────▶ │ registry      │
 │            │  /api/.../registry │  SchemaRegistryService       │  Confluent  │ Confluent SR  │
 │            │                    │  CodecService (decode/encode)│  Apicurio   │ Apicurio      │
@@ -173,6 +173,7 @@ Adapters ship as Spring `@Configuration` beans; `ConfluentCompatibleAdapter` is 
 ## 5. Feature catalogue ("everything possible")
 
 ### 5.1 Read path (consume/visualize)
+
 1. Automatic wire-format detection per message (sniffer + headers).
 2. Decode Avro/Protobuf/JSON-Schema to readable JSON with logical types.
 3. Raw-bytes view + hex view toggle (always available).
@@ -185,42 +186,45 @@ Adapters ship as Spring `@Configuration` beans; `ConfluentCompatibleAdapter` is 
    fails because a registry is down).
 9. Batch decode stats on browse pages: "48/50 decoded (Avro), 2 unknown".
 
-### 5.2 Write path (produce)
-10. Subject-aware produce form: subject dropdown (filtered by topic strategy), version picker.
-11. One-click sample payload generation from the schema (Avro/Proto defaults, respect defaults
+
+
+ Subject-aware produce form: subject dropdown (filtered by topic strategy), version picker.
+ 2. One-click sample payload generation from the schema (Avro/Proto defaults, respect defaults
     and logical types).
-12. Inline schema-aware validation before send (required fields, enums, patterns) + registry
+ 3. Inline schema-aware validation before send (required fields, enums, patterns) + registry
     compatibility pre-check with human-readable incompatibility reasons.
-13. Correct wire-format encoding per connected registry (including Apicurio/Glue headers modes).
-14. Key-schema support (encode keys too).
-15. Auto-register toggle + dry-run register (register schema version without producing).
-16. Reproduce-message integration: reproducing a decoded message re-encodes losslessly.
+ 4. Correct wire-format encoding per connected registry (including Apicurio/Glue headers modes).
+ 5. Key-schema support (encode keys too).
+ 6. Auto-register toggle + dry-run register (register schema version without producing).
+ 7. Reproduce-message integration: reproducing a decoded message re-encodes losslessly.
 
-### 5.3 Registry browser (management)
-17. Subjects list: search, filter by format/strategy, compatibility mode badges, message counts
+
+
+ Subjects list: search, filter by format/strategy, compatibility mode badges, message counts
     (join with broker data: which topics use which subject).
-18. Version timeline per subject with **visual diff** between any two versions (JSON diff for
+ 2. Version timeline per subject with **visual diff** between any two versions (JSON diff for
     Avro/JSON; descriptor diff for Protobuf) and breaking-change highlighting.
-19. Compatibility mode viewer + editor (where supported).
-20. References tree (nested Avro / proto imports) with navigation.
-21. Schema upload: paste schema + choose subject + auto compatibility pre-check + register
+ 3. Compatibility mode viewer + editor (where supported).
+ 4. References tree (nested Avro / proto imports) with navigation.
+ 5. Schema upload: paste schema + choose subject + auto compatibility pre-check + register
     (dry-run first, then real).
-22. Export: subject/version schema download, full-subject JSON export.
-23. Registry health & connectivity panel: latency, auth status, cache stats.
+ 6. Export: subject/version schema download, full-subject JSON export.
+ 7. Registry health & connectivity panel: latency, auth status, cache stats.
 
-### 5.4 Cross-cutting
-24. Per-cluster registry attachment (0..n registries per Kafka cluster — a cluster can have
+
+
+ Per-cluster registry attachment (0..n registries per Kafka cluster — a cluster can have
     Confluent SR *and* a Glue registry for different topics; the sniffer resolves per message).
-25. Registry settings stored with profiles; secrets masked in API responses (same policy as connections).
-26. Metrics: decode success rate, registry call count/latency, cache hit rate (actuator + UI panel).
-27. Accessibility & theming: all new UI built on the existing token system (dark/light).
+ 2. Registry settings stored with profiles; secrets masked in API responses (same policy as connections).
+ 3. Metrics: decode success rate, registry call count/latency, cache hit rate (actuator + UI panel).
+ 4. Accessibility & theming: all new UI built on the existing token system (dark/light).
 
 ---
 
 ## 6. API design (new endpoints, all under the existing patterns)
 
-```
-# registry attachment management (stored per cluster profile)
+```http
+ (stored per cluster profile)
 PUT    /api/clusters/{id}/registry                    # attach/update settings (type, url, auth…)
 GET    /api/clusters/{id}/registry                    # masked view + health
 DELETE /api/clusters/{id}/registry
@@ -247,12 +251,14 @@ no client-side registry calls, ever.
 ## 7. UX design
 
 ### 7.1 Connections → "Schema registry" step
+
 Third step in the connection wizard (after security): registry type cards
 (Confluent-compatible / Apicurio / AWS Glue / Azure / None), URL, auth fields (per type),
 **Test registry** button (validates + shows version string and latency), and a note when the
 registry is optional ("you can attach it later; topics just show raw until then").
 
 ### 7.2 Data Explorer
+
 - New **codec chip** per message: `Avro · orders-value v4` (click → schema), `Raw` (unknown).
 - Message viewer gains tabs: **Decoded** (default) / **Raw** / **Hex** / **Schema**.
 - Reader-schema selector in the toolbar (dropdown of compatible versions) with
@@ -262,11 +268,13 @@ registry is optional ("you can attach it later; topics just show raw until then"
   issues in plain language ("field `amount` must be a decimal(12,2)").
 
 ### 7.3 Schemas page (new sidebar entry)
+
 - Master–detail: subjects list (search, format badges, compat badges) → version timeline
   → schema view (pretty + raw tabs), diff slider between versions, references tree.
 - Actions: register new version (upload), edit compatibility, export, (guarded) delete.
 
 ### 7.4 Language & states
+
 - Registry down → amber banner in schema-dependent widgets: "Schema registry unreachable —
   showing raw messages", never red errors in the Explorer.
 - Loading = skeletons (consistent with existing design system); empty states explain how to attach
@@ -294,8 +302,8 @@ registry is optional ("you can attach it later; topics just show raw until then"
 
 ## 9. Data model & storage
 
-```
-SchemaRegistrySettings {
+```text
+
   type: CONFLUENT | APICURIO | GLUE | AZURE,
   url, authType: NONE|BASIC|BEARER|MTLS|IAM,
   username?, password?, bearerTokenUrl?, clientId?, clientSecret?, scope?,
@@ -304,6 +312,7 @@ SchemaRegistrySettings {
   cacheTtlSeconds?, requestTimeoutMs?
 }
 ```
+
 Stored inside the existing `ConnectionProfile` (per Kafka cluster) *or* standalone and referenced —
 profiles support both ("attach shared registry"). Persisted in the same atomically-written
 connections file; secrets masked in responses.
@@ -313,7 +322,7 @@ connections file; secrets masked in responses.
 ## 10. Testing strategy
 
 | Layer | What | Tooling |
-|---|---|---|
+| --- | --- | --- |
 | Unit | sniffer fixture table (every magic/headers case), strategy resolution, Avro/Proto/JSON codecs incl. logical types, cache TTL/LRU | JUnit + fixture files |
 | Adapter | REST contract tests per adapter against recorded responses (WireMock) + live Testcontainers for Confluent SR & Apicurio | Testcontainers, WireMock |
 | Integration | full loop: register schema → produce encoded (via Kview) → browse decoded (via Kview) → schema evolution case (backward-compatible + breaking) | embedded Kafka + Testcontainers SR |
@@ -328,7 +337,7 @@ in both themes + docs updates (README + this file's matrix moving rows from PLAN
 ## 11. Phased roadmap
 
 | Phase | Scope | Size (dev-days) | Acceptance criteria |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **0. Foundations** ✅ **DONE** | ByteArray pipeline for explorer/tail/produce (behind the scenes), wire-format sniffer with fixtures, "unknown binary" badges, settings model | done | ✅ E2E/QA suites green; byte pipeline live; unknown formats render raw+badge |
 | **1. Confluent-compatible read path** ✅ **DONE (LIVE-VERIFIED)** | Confluent adapter (subjects/versions/schema/byWireId), Avro+JSON decode, schema cache, Explorer decode + codec chips, `/decode` endpoint | done | ✅ Live-verified against local broker + mock registry: Avro messages decode (`orders-value` id 1 → JSON), codec chips, Decoded/Raw/Hex tabs, registry test+attach via UI/API (`scripts/verify-compatibility.mjs`, `SchemaDecodeIntegrationTest`) |
 | **2. Write path (Avro + JSON Schema)** DONE (live-verified) — Protobuf tracked as 2b | produce encoding for AVRO (GenericRecord binary + wire header) and JSON (networknt validation), subject/version picker, sample generator, encode dryRun validation, key support | done | Live-verified: UI schema-mode produce to wire bytes, browse decodes; payload violations rejected with schema errors |
@@ -345,7 +354,7 @@ Total ≈ 39–50 dev-days for the full scope; **phase 1 alone (read path for th
 ## 12. Risks & mitigations
 
 | Risk | Mitigation |
-|---|---|
+| --- | --- |
 | Ambiguous wire formats (same magic, different registry) | Sniffer attaches per *configured* registry for the cluster; multiple attachments resolved by trial decode + score; ambiguous → raw + badge |
 | Avro references cycles / deep nesting | Reference resolver with depth limit + cycle detection; failure = raw view |
 | Registry latency on tails | Schema cache (TTL+LRU); registry calls only on new schema IDs |

@@ -5,7 +5,7 @@ Cutting a release is a version bump + one tag; the release workflow does the res
 ## One-time setup (per channel)
 
 | Channel | Setup | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Docker (GHCR) | nothing | pushes with `GITHUB_TOKEN` on every tag |
 | Docker Hub | repo secrets `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (a Docker Hub access token), `DOCKERHUB_REPOSITORY` (e.g. `ritikbansod2912/kview`) | the multi-arch image is **mirrored from GHCR** with `buildx imagetools` — same digests, no rebuild; the step is skipped while the secrets are absent. `ritikbansod2912/kview:1.0.0` + `:latest` were pushed manually on 2026-09-28 (verified pullable + smoke-tested) |
 | GitHub bundles | nothing | jar + Linux/macOS/Windows jpackage bundles + Linux `.deb` attach to the release |

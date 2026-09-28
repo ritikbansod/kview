@@ -16,7 +16,7 @@
 ## Summary
 
 | Suite | Checks | Result |
-|---|---|---|
+| --- | --- | --- |
 | Functional E2E (`scripts/e2e-test.mjs`) | 79 | **79 passed / 0 failed** |
 | Negative & boundary (`scripts/qa-negative-test.mjs`) | 35 | **35 passed / 0 failed** after fixes (was 30/5) |
 | Unit + embedded-Kafka integration (`mvn test`) | 14 | **14 passed / 0 failed** |
@@ -29,41 +29,53 @@
 ## Bugs found
 
 ### BUG-01 — Dashboard auto-refresh timer leaks and hijacks other views — **HIGH — FIXED, VERIFIED**
+
 *UI · dashboard*
+
 - **Repro:** Dashboard → tick "auto-refresh (10s)" → navigate to any other page.
 - **Impact:** a leaked `setInterval` kept polling `/overview` forever and **re-rendered the dashboard over whichever page the user was on** (observed: Consumer Groups view replaced by the dashboard ~10s after navigating away). With `wireAutoRefresh` called twice per render, two intervals were created but cleanup only cleared the last one.
 - **Fix:** removed the duplicate `wireAutoRefresh` call; route changes now invoke a `window.__dashStop` cleanup (same pattern as the live tail).
 - **Verified:** instrumented `setInterval` — exactly one interval created, cleared on navigation, **0** `/overview` calls after leaving the view; target view stays put.
 
 ### BUG-02 — Live tail could not connect from the UI — **HIGH — FIXED, VERIFIED**
+
 *UI · data explorer*
+
 - **Repro:** Data Explorer → Live tail → Start. Status flipped to "Stopped." immediately; no messages ever streamed.
 - **Root cause:** the `EventSource` URL was built without the `/api` prefix and without `/topics/` (`/clusters/default/shipments/tail`).
 - **Fix:** corrected URL to `/api/clusters/{id}/topics/{topic}/tail`.
 - **Verified:** UI tail connects ("Connected — waiting for messages"), messages produced via API appear in the stream in <1s with rate counter; Stop works.
 
 ### BUG-03 — Malformed request bodies returned HTTP 500 — **MEDIUM — FIXED, VERIFIED**
+
 *API · error mapping*
+
 - **Repro:** `POST /api/clusters/default/topics` with `{bad json` → 500. Same for wrong field types (`"partitions": "two"`), missing body, and `headers` sent as a string.
 - **Expected:** 400. **Root cause:** `HttpMessageNotReadableException` had no mapping in `ApiExceptionHandler`.
 - **Fix:** added mappings for `HttpMessageNotReadableException` (400), `MethodArgumentTypeMismatchException` (400), `MissingServletRequestParameterException` (400), `HttpRequestMethodNotSupportedException` (405).
 - **Verified:** malformed JSON → **400**, wrong types → **400**, missing body → **400**, headers-as-string → **400**, PATCH → **405**.
 
 ### BUG-04 — Consumer group detail crashed with HTTP 500 — **MEDIUM — FIXED, VERIFIED** *(found during earlier E2E run)*
+
 *API · consumer groups*
+
 - **Root cause:** `TreeMap<TopicPartition, …>` — `TopicPartition` no longer implements `Comparable` on Kafka 4.3 clients.
 - **Fix:** replaced with `HashMap` (output already sorted by topic/partition explicitly).
 - **Verified:** `GET /api/clusters/default/groups/{id}` returns 200 with lag breakdown.
 
 ### BUG-05 — Browse with an explicit offsets map returned other partitions too — **MEDIUM — FIXED, VERIFIED** *(found during earlier E2E run)*
+
 *API · data explorer*
+
 - **Fix:** offsets mode now restricts browsing to exactly the partitions named in the map.
 - **Verified:** `{"0": 5}` returns partition-0 records with offset ≥ 5 only.
 
 ### KNOWN-01 — Windows dev broker crashes when deleting a topic right after writing to it — **OPEN — environmental, not a Kview bug**
+
 - `AccessDeniedException` on log-dir rename (memory-mapped index files) → Kafka treats the dir as failed and shuts down. Known Kafka-on-Windows limitation; does not occur on Linux. Mitigated in the QA/E2E suites with automatic broker restart + re-verify. Documented in README.
 
 ### Notes (by design, worth knowing)
+
 - The legacy dynamic-consumer endpoint (`/api/consumers`) never commits offsets by design (read-only verification tool), so such groups show committed=0 with lag = full topic depth. Use the live tail with `groupId` + `autoCommit=true` to visualize real committing consumption.
 - Switching the topic dropdown while a live tail is running does not move the tail to the new topic (the tail is pinned at start). Stop and restart the tail.
 
@@ -84,7 +96,7 @@
 Scope: phases 0–1 of SCHEMA-REGISTRY-PLAN.md (byte pipeline, registry attachments, decode pipeline, UI).
 
 | # | Severity | Finding | Status |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | SR-01 | HIGH | Registry settings collected in the connection wizard were **silently dropped** — `ConnectionProfile` never carried them and no `PUT /registry` was called, so attaching via the UI had no effect (only the API path worked). Verified by creating a profile with `schemaRegistry` via the wizard's exact payload and observing 404 on `GET /registry`. | **FIXED** — wizard save now attaches/detaches via `PUT/DELETE /api/clusters/{id}/registry`; a dedicated registry-only modal was added for the built-in default cluster. Re-verified in the UI. |
 | SR-02 | LOW | Decode of an unknown schema id returns `wireFormat: "UNKNOWN"` although the wire header *was* recognized (Confluent) — slightly misleading semantics; the `error` field does carry the registry 404. | OPEN (cosmetic) — suggest returning the detected format with a separate failure flag. |
 

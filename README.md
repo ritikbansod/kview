@@ -35,7 +35,7 @@ OAUTHBEARER). [COMPATIBILITY.md](COMPATIBILITY.md) has the exact settings per di
 ## Install
 
 | Channel | Get it | Needs |
-|---|---|---|
+| --- | --- | --- |
 | **JAR** | [Releases](https://github.com/ritikbansod/kview/releases) → `kview.jar` — starts the server UI, or the direct CLI: `java -jar kview.jar --cli topics --bootstrap-server localhost:9092` | Java 21+ |
 | **Native bundles** | Releases → `kview-<v>-linux-x64.tar.gz` / `kview-<v>-macos-aarch64.tar.gz` / `kview-<v>-windows-x64.zip` (also a Linux `.deb`) — bundled JRE, server launcher **and** `kview` CLI | nothing |
 | **npm** | `npm install -g kview` → `kview` (thin client; direct mode when a jar/`KVIEW_JAR` is present) and `npx kview-mcp` | Node 18+ |
@@ -76,6 +76,7 @@ consumer group, so it is safe to point at production topics.
 ### 1. Web UI
 
 **Option A — Docker (recommended):**
+
 ```bash
 # Point at an existing Kafka broker:
 docker run -d -p 8090:8090 -e KAFKA_BOOTSTRAP_SERVERS=localhost:9092 ghcr.io/ritikbansod/kview:latest
@@ -86,11 +87,13 @@ docker compose up -d
 
 **Option B — Standalone JAR (needs Java 21+):**
 Download `kview-1.1.0.jar` from [Releases](https://github.com/ritikbansod/kview/releases):
+
 ```bash
 java -jar kview-1.1.0.jar
 ```
 
 **Option C — Build from source (needs Java 21 and Maven):**
+
 ```bash
 mvn package
 java -jar target/kview-1.1.0.jar
@@ -200,7 +203,7 @@ endpoints directly. Connection tester at `POST /api/clusters/test`, health check
 Go to Connections -> Add cluster (or `POST /api/clusters`). What you need for each setup:
 
 | Setup | Fields |
-|---|---|
+| --- | --- |
 | local dev cluster | protocol `PLAINTEXT`, bootstrap servers |
 | TLS | truststore as file or pasted PEM, hostname verification toggle |
 | mTLS (e.g. Strimzi) | CA PEM plus client certificate and key (PEM or keystore) |
@@ -213,7 +216,7 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 ## Configuration
 
 | Env var | Default | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | bootstrap servers of the default cluster |
 | `KVIEW_BIND` | `127.0.0.1` | address to bind to (`0.0.0.0` in Docker container) |
 | `KVIEW_DATA_DIR` | `./data` | where connections.json is stored |

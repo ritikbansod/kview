@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-09-28
 
 ### Added
+
 - **Distribution channels** (jar, native bundles, npm, Docker, Homebrew, SDKMAN): each release now ships jpackage native bundles with a bundled JRE for Linux (tar.gz + .deb), macOS (tar.gz) and Windows (zip) — server launcher plus a `kview` direct-CLI wrapper, no Java install needed; an npm `kview` package (thin client + `kview-mcp`, direct mode when a jar/`KVIEW_JAR` is present); Docker CLI passthrough; a Homebrew formula template pushed to the tap on release; and `docs/RELEASING.md` with the full per-channel checklist (including the manual SDKMAN submission). Release steps for npm/Homebrew activate when their repo secrets (`NPM_TOKEN`, `HOMEBREW_TAP_TOKEN`) are configured.
 - **Direct-mode CLI** (`java -jar kview.jar --cli <command>` or the shipped `kview`/`kview.cmd` wrappers): talk to a broker straight from the jar without a server — overview, topics, topic detail, browse (schema-registry decoded), groups, lag, produce, search and replay, with `--json` output and the full security flag set (SASL/mTLS/OAuth). Boots a headless (no web server) application context and reuses the same services as the UI; an optional `--schema-registry URL` attaches a volatile registry for decoding. The thin REST client (`cli/kview.mjs`) remains for CI/remote use.
 - **Protobuf decode and encode for Schema Registry topics** (F4): PROTOBUF subjects now decode in the browser, live tail and `/decode` endpoint into proto3 JSON (original field names), and JSON payloads encode into Confluent wire bytes (message-index prefix included) on the produce path. `.proto` text from the registry is compiled in-process via `kafka-protobuf-provider` (Confluent Community License, resolved from `packages.confluent.io`); compiled schemas are TTL-cached. Multi-message `.proto` files select the message via the wire prefix or an optional `messageName` on `/encode`. Nested-message indexes are not supported yet.
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AI/MCP safety pack**: global read-only mode (`KVIEW_READONLY=true` — every mutation refused for all clients and roles, UI shows a banner), an append-only mutation audit trail (`KVIEW_AUDIT=true` → `<data-dir>/audit.log` JSONL with client, method, path and status; all three clients send an `X-Kview-Client` identifier), a public `GET /api/meta` endpoint, and a per-tool allowlist for the MCP server (`KVIEW_ALLOWED_TOOLS`, e.g. serve only read-only tools to an AI agent).
 
 ### Fixed
+
 - **MCP server**: `mcp/kview-mcp.js` crashed on startup with `SyntaxError: Cannot use import statement outside a module` on Node ≤ 22.6 (ESM in a `.js` file with no `package.json`) — fixed by shipping `mcp/package.json` with `"type": "module"`.
 - **CLI**: `kview lag <group>` read a non-existent `byTopic` field and silently printed no per-partition lag rows — now reads `partitionsByTopic`, as the API serializes it.
 - **CLI**: `kview clusters` tabled a `securityProtocol` field the API never returns, leaving SECURITY always empty — now derived from the masked `security` object.
@@ -29,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tests**: integration tests overrode a wrong property name (`kafka-wrapper.data-dir`) and rewrote the developer's real `./data` directory on every run — both suites now point `kview.data-dir` at `target/`.
 
 ### Changed
+
 - **Java package renamed** `com.ritikbansod.kafkawrapper` → `com.ritikbansod.kview` (and `KafkaWrapperApplication` → `KviewApplication`) — no behavior change; the project is uniformly Kview. The local clone folder can be renamed to `kview` as well.
 - **Spring Boot 3.3.4 → 3.5.16** (completes the release plan's P2.3 — the 3.3 line is past OSS support end): lifts Spring Framework to 6.2.x, Spring Security to 6.5.x, spring-kafka to 3.3.x, micrometer to 1.15.x and **kafka-clients to 3.9.2**; `KafkaClusterManager` now passes `SslBundles` to the Kafka properties builders, as required by the new builder signatures.
 - Docs: corrected the README `reset-offsets` example; the README roadmap and COMPATIBILITY.md no longer describe the shipped Schema Registry support (Avro/JSON) as unbuilt; internal working documents moved from the repo root to `docs/`.
@@ -42,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Initial Public Release
 
 #### Web UI & Management
+
 - **Dashboard**: Real-time cluster KPIs (broker counts, controller ID, topic and partition counts, estimated messages, consumer groups, under-replicated and offline partitions).
 - **Broker Partition Distribution**: Visual analysis of partition balance across brokers with config inspector modal.
 - **Cluster Architecture & Topology**: Live end-to-end diagram visualizing Producers → Cluster (Brokers + Topics + Partitions) → Consumers with SVG connections and throughput metrics.
@@ -52,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Theme**: Token-based dark and light themes following system preferences.
 
 #### Data Explorer
+
 - **Read-Only Safety**: Non-committing message browser using partition assignment and explicit seeks without triggering group rebalances.
 - **Flexible Seeks**: Seek by earliest, latest (scans backwards from high watermarks), explicit partition offsets map, or timestamp.
 - **Live Tail**: Real-time Server-Sent Events (SSE) streaming with auto-scroll, rate counter, and optional real consumer group attachment.
@@ -59,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Producer**: Built-in produce form with key, headers, partition pinning, and live JSON syntax validation.
 
 #### Schema Registry Integration
+
 - **Generic SPI**: Pluggable `SchemaRegistryAdapter` supporting Confluent Schema Registry, Confluent Cloud, Redpanda, Karapace, and Apicurio.
 - **Wire Format Sniffer**: Detects 5-byte Confluent wire format with safe raw fallback for unknown binaries.
 - **Avro & JSON Schema Codecs**: Generic decoding and encoding supporting logical types (dates, timestamps, decimals, UUIDs).
@@ -66,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Schema Caching**: 5-minute memory TTL cache for schema resolution at $O(1)$ during high-throughput tails.
 
 #### Multi-Cluster Connections & Security
+
 - **Multi-Cluster Support**: Connect to and switch between multiple Kafka clusters dynamically at runtime.
 - **Security Protocols**: PLAINTEXT, TLS/SSL, mTLS (with keystores or direct PEM certificate paste), and SASL (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, OAUTHBEARER).
 - **OAuth2 OIDC**: Automatic token fetching and refresh via client-credentials flow.
@@ -73,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Default Loopback Binding**: Binds to `127.0.0.1` by default for safe local development.
 
 #### Interfaces & Tooling
+
 - **REST API**: Clean RESTful endpoints mounted under `/api/clusters/{clusterId}/...`.
 - **Node.js CLI (`cli/kview.mjs`)**: Dependency-free CLI for cluster operations, message browsing, producing, and offset resets.
 - **MCP Server (`mcp/kview-mcp.js`)**: 16 Model Context Protocol tools over JSON-RPC stdio for AI assistants (Claude Desktop, Cursor, ZCode).

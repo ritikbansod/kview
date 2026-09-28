@@ -14,8 +14,8 @@ It is pre-configured and optimized to run seamlessly on **Docker-based Kubernete
 * **Brokers (Data Plane):** 3 dedicated brokers managed via `KafkaNodePool` (`name: broker`)
 * **Memory Tuned for Docker:** JVM heap sizes (`-Xms`/`-Xmx`) and memory requests/limits are tuned so that all 6 Kafka nodes + Operator + Keycloak fit easily in standard Docker engine limits (4GB–8GB RAM).
 
-```
-                      [ Docker Kubernetes Cluster ]
+```text
+
   
   +-------------------------------------------------------------------------+
   |                                                                         |
@@ -39,7 +39,7 @@ It is pre-configured and optimized to run seamlessly on **Docker-based Kubernete
 ### Configured Listeners
 
 | Port | Name | Type | Protocol | Auth Mechanism | Intended Use |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | **`9092`** | `plain` | `internal` | `PLAINTEXT` | None | Internal unencrypted testing within the cluster |
 | **`9093`** | `tls` | `internal` | `SSL` | mTLS (TLS Client Auth) | Secure inter-service communication inside Kubernetes |
 | **`9094`** / **`443`** | `oauth` | `loadbalancer` | `SASL_SSL` | OAuth 2.0 (`OAUTHBEARER`) | External authentication against Keycloak / Okta / Entra ID |
@@ -49,13 +49,13 @@ It is pre-configured and optimized to run seamlessly on **Docker-based Kubernete
 
 ## File Structure
 
-- [00-crds.yaml](00-crds.yaml): Official Strimzi 1.2.0 CRDs (installed first to prevent schema errors).
-- [01-strimzi-operator.yaml](01-strimzi-operator.yaml): Strimzi 1.2.0 Cluster Operator configured for namespace `kafka`.
-- [02-kafka-cluster.yaml](02-kafka-cluster.yaml): Declares 3 controllers, 3 brokers (`KafkaNodePool`), and the 4 listeners.
-- [03-sample-user-topic.yaml](03-sample-user-topic.yaml): Declares `test-topic` (3 partitions, 3 replicas) and `test-mtls-user` (auto-issues mTLS certs).
-- [04-keycloak-oauth-mock.yaml](04-keycloak-oauth-mock.yaml): Self-contained Keycloak OIDC provider for out-of-the-box OAuth testing.
-- [kind-config.yaml](kind-config.yaml): Cluster configuration for Kind (Kubernetes in Docker) with port mappings.
-- [kustomization.yaml](kustomization.yaml): Allows deploying the full stack with `kubectl apply -k example/strimzi/`.
+* [00-crds.yaml](00-crds.yaml): Official Strimzi 1.2.0 CRDs (installed first to prevent schema errors).
+* [01-strimzi-operator.yaml](01-strimzi-operator.yaml): Strimzi 1.2.0 Cluster Operator configured for namespace `kafka`.
+* [02-kafka-cluster.yaml](02-kafka-cluster.yaml): Declares 3 controllers, 3 brokers (`KafkaNodePool`), and the 4 listeners.
+* [03-sample-user-topic.yaml](03-sample-user-topic.yaml): Declares `test-topic` (3 partitions, 3 replicas) and `test-mtls-user` (auto-issues mTLS certs).
+* [04-keycloak-oauth-mock.yaml](04-keycloak-oauth-mock.yaml): Self-contained Keycloak OIDC provider for out-of-the-box OAuth testing.
+* [kind-config.yaml](kind-config.yaml): Cluster configuration for Kind (Kubernetes in Docker) with port mappings.
+* [kustomization.yaml](kustomization.yaml): Allows deploying the full stack with `kubectl apply -k example/strimzi/`.
 
 ---
 
@@ -123,7 +123,9 @@ kubectl apply -k example/strimzi/
 # Check KafkaNodePool resources
 kubectl get knp -n kafka
 ```
+
 Output:
+
 ```text
 NAME         DESIRED   CURRENT   READY   ROLES
 broker       3         3         3       broker
@@ -134,7 +136,9 @@ controller   3         3         3       controller
 # View all running pods
 kubectl get pods -n kafka
 ```
+
 Output:
+
 ```text
 NAME                                         READY   STATUS    RESTARTS   AGE
 keycloak-xxxxxxxxxx-xxxxx                    1/1     Running   0          3m
@@ -155,6 +159,7 @@ strimzi-cluster-operator-xxxxxxxxxx-xxxxx    1/1     Running   0          4m
 ### 1. Test Port 9092: PLAINTEXT (Internal)
 
 Run a test producer pod directly inside the cluster:
+
 ```bash
 kubectl run kafka-producer -n kafka --rm -i --tty --image=apache/kafka:4.3.1 -- \
   /opt/kafka/bin/kafka-console-producer.sh \
@@ -167,6 +172,7 @@ kubectl run kafka-producer -n kafka --rm -i --tty --image=apache/kafka:4.3.1 -- 
 ### 2. Test Port 9093: Internal mTLS (Mutual TLS)
 
 Extract the cluster CA certificate and user credentials from the generated Kubernetes secrets:
+
 ```bash
 # Cluster CA cert
 kubectl get secret kview-cluster-cluster-ca-cert -n kafka -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
@@ -183,6 +189,7 @@ Connect inside the cluster using `SSL` protocol with `ca.crt`, `user.crt`, and `
 ### 3. Test Port 9094 / 443: External OAuth 2.0 (`OAUTHBEARER`)
 
 #### Step A: Fetch an Access Token from Keycloak
+
 ```bash
 TOKEN=$(curl -s -X POST "http://localhost:8080/realms/kafka/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -192,7 +199,9 @@ TOKEN=$(curl -s -X POST "http://localhost:8080/realms/kafka/protocol/openid-conn
 ```
 
 #### Step B: Connect Kafka Client
+
 Configure client properties:
+
 ```properties
 security.protocol=SASL_SSL
 sasl.mechanism=OAUTHBEARER
@@ -206,16 +215,19 @@ sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginMo
 ### 4. Test Port 9095: External mTLS
 
 Bootstrap service address:
+
 ```bash
 kubectl get svc kview-cluster-kafka-extmtls-bootstrap -n kafka
 ```
+
 *(On Docker Desktop or Kind with port mappings, connect to `localhost:9095`)*.
 
 Connect using:
-- **Security Protocol:** `SSL`
-- **Truststore / CA:** `ca.crt` (from secret `kview-cluster-cluster-ca-cert`)
-- **Client Certificate:** `user.crt` (from secret `test-mtls-user`)
-- **Client Key:** `user.key` (from secret `test-mtls-user`)
+
+* **Security Protocol:** `SSL`
+* **Truststore / CA:** `ca.crt` (from secret `kview-cluster-cluster-ca-cert`)
+* **Client Certificate:** `user.crt` (from secret `test-mtls-user`)
+* **Client Key:** `user.key` (from secret `test-mtls-user`)
 
 ---
 
@@ -224,26 +236,26 @@ Connect using:
 In the **Kview Web UI** (`Connections -> Add cluster`):
 
 1. **PLAINTEXT (Port 9092):**
-   - Bootstrap: `kview-cluster-kafka-bootstrap.kafka.svc:9092`
-   - Protocol: `PLAINTEXT`
+   * Bootstrap: `kview-cluster-kafka-bootstrap.kafka.svc:9092`
+   * Protocol: `PLAINTEXT`
 
 2. **mTLS (Port 9093 / 9095):**
-   - Bootstrap: `localhost:9095` (or external IP)
-   - Protocol: `SSL`
-   - CA Certificate: Paste contents of `ca.crt`
-   - Client Certificate: Paste contents of `user.crt`
-   - Client Key: Paste contents of `user.key`
-   - Hostname Verification: OFF
+   * Bootstrap: `localhost:9095` (or external IP)
+   * Protocol: `SSL`
+   * CA Certificate: Paste contents of `ca.crt`
+   * Client Certificate: Paste contents of `user.crt`
+   * Client Key: Paste contents of `user.key`
+   * Hostname Verification: OFF
 
 3. **OAuth 2.0 (Port 9094):**
-   - Bootstrap: `<bootstrap-address>:9094` (or NodePort e.g. `localhost:30251`)
-   - Protocol: `SASL_SSL`
-   - SASL Mechanism: `OAUTHBEARER`
-   - Token Endpoint URL: `http://<keycloak-host>:8080/realms/kafka/protocol/openid-connect/token`
-   - Client ID: `kview-client`
-   - Client Secret: `kview-secret`
-   - CA Certificate: Paste contents of `ca.crt` (one-way TLS)
-   - Hostname Verification: **OFF** (required when connecting via external IP / localhost with Strimzi self-signed internal SANs)
+   * Bootstrap: `<bootstrap-address>:9094` (or NodePort e.g. `localhost:30251`)
+   * Protocol: `SASL_SSL`
+   * SASL Mechanism: `OAUTHBEARER`
+   * Token Endpoint URL: `http://<keycloak-host>:8080/realms/kafka/protocol/openid-connect/token`
+   * Client ID: `kview-client`
+   * Client Secret: `kview-secret`
+   * CA Certificate: Paste contents of `ca.crt` (one-way TLS)
+   * Hostname Verification: **OFF** (required when connecting via external IP / localhost with Strimzi self-signed internal SANs)
 
 ---
 

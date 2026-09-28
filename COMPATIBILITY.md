@@ -9,7 +9,7 @@
 ## 1. Why it is distribution-agnostic (architecture-level analysis)
 
 | Layer | What Kview uses | Why it is portable |
-|---|---|---|
+| --- | --- | --- |
 | Protocol | `kafka-clients` (Apache, Apache-2.0) | Implements the official Kafka wire protocol with runtime `ApiVersions` negotiation — it adapts itself to whatever the broker announces. Strimzi, Confluent Platform, Confluent Cloud, Redpanda, MSK and Event Hubs all serve this same protocol. |
 | Version range | kafka-clients **3.9.2** | Clients negotiate down: officially compatible with brokers **2.1 → 4.x**. Live-verified against brokers 3.7.0, 3.7.1 **and** 4.3.1 with the earlier 3.7.1 client — re-verification on 3.9.2 via `scripts/verify-compatibility.mjs` is welcome. |
 | Security | `KafkaClientPropertiesFactory` → raw Kafka `ssl.*` / `sasl.*` properties | Covers every standard shape: PLAINTEXT, TLS (keystore files **or pasted PEM**), client-cert mTLS, SASL PLAIN / SCRAM-SHA-256 / SCRAM-SHA-512 / OAUTHBEARER, hostname-verification toggle. |
@@ -25,7 +25,7 @@
 Legend: **LIVE** = verified end-to-end against a real cluster in this repo · **SHAPE** = the distribution's exact security/config shape verified end-to-end against a real broker (distributions only re-package these shapes) · **ANALYSIS** = reasoning + extension point, no live cluster available.
 
 | # | Distribution / flavor | Typical connection shape | Status | Evidence |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | **Apache Kafka 4.3** (KRaft) | PLAINTEXT `:9092` | **LIVE** | Daily-dev broker in this repo; 79/79 E2E + 35/35 negative QA + 21/21 compat checks |
 | 2 | **Apache Kafka 3.7** (docker image) | PLAINTEXT | **LIVE** | Verified during development (produce/browse/overview) |
 | 3 | **Apache Kafka 2.1 – 3.x** | any | ANALYSIS | Client 3.7.x is officially wire-compatible with brokers 2.1+ (Apache compatibility policy); no Kview code pins API versions |
@@ -48,7 +48,7 @@ Legend: **LIVE** = verified end-to-end against a real cluster in this repo · **
 Create the profile in **Connections → Add cluster** (or `POST /api/clusters`). Fields per shape:
 
 | Shape | Fields |
-|---|---|
+| --- | --- |
 | Unsecured dev cluster | protocol `PLAINTEXT`, bootstrap servers |
 | TLS (server auth only) | protocol `SSL`, trust = CA PEM (or truststore file), hostname verification on |
 | mTLS (Strimzi style) | protocol `SSL`, trust = CA PEM, client cert = PEM chain + key (or keystore file), optionally hostname verification off for the Strimzi broker cert |
@@ -60,7 +60,7 @@ Create the profile in **Connections → Add cluster** (or `POST /api/clusters`).
 ## 4. Extension points (things that are NOT plain Kafka)
 
 | Add-on | Status |
-|---|---|
+| --- | --- |
 | **AWS MSK IAM** | Not built in (requires Amazon's proprietary `aws-msk-iam-auth` SASL mechanism). Extension point: drop the jar in, add a mechanism option mapped to `AWS_MSK_IAM` + its callback handler class. |
 | **Schema Registry (Confluent/Apicurio)** | Shipped in v1.0.0 for Avro and JSON Schema over the Confluent wire format; Protobuf decode/encode shipped as well. |
 | **Confluent MDS / RBAC** | Control-plane auth for Confluent tooling — unrelated to the data-plane protocol Kview uses. |
@@ -79,7 +79,7 @@ node scripts/verify-compatibility.mjs
 
 Listeners (single KRaft node, `.kafka/kafka/server.properties`):
 
-```
+```properties
 listeners=BROKER://:9092,TLS://:9093,SCRAM://:9094,CLOUD://:9095,CONTROLLER://:19099
 listener.security.protocol.map=BROKER:PLAINTEXT,TLS:SSL,SCRAM:SASL_SSL,CLOUD:SASL_SSL,CONTROLLER:PLAINTEXT
 ssl.client.auth=none

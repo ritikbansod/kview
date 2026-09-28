@@ -59,7 +59,7 @@ the schema registry browser, is the remaining roadmap item).
 ## 3. Distribution & install
 
 | Channel | What you get |
-|---|---|
+| --- | --- |
 | **JAR** (GitHub Releases) | tested `kview.jar` — starts the server UI *or* the direct CLI |
 | **Native bundles** | `kview-<v>-linux-x64.tar.gz` (+ `.deb`), `kview-<v>-macos-aarch64.tar.gz`, `kview-<v>-windows-x64.zip` — bundled JRE, server launcher **and** `kview` CLI; no Java install needed |
 | **npm** | `npm install -g kview` → thin client + `npx kview-mcp`; direct mode when a jar/`KVIEW_JAR` is present |
