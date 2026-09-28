@@ -28,19 +28,19 @@ Clone the repository:
 ```bash
 git clone https://github.com/ritikbansod/kview.git
 cd kview
-```
+```text
 
 Build the executable JAR:
 
 ```bash
 ./mvnw clean package
-```
+```text
 
 Run Kview locally:
 
 ```bash
 java -jar target/kview-1.1.0.jar
-```
+```text
 
 Then open `http://localhost:8090` in your browser.
 
@@ -50,11 +50,11 @@ If you don't have an existing Kafka cluster, start a local KRaft broker with:
 
 ```bash
 docker compose up -d kafka
-```
+```text
 
 ### Project Structure
 
-```
+```text
 src/main/java/com/ritikbansod/kview/   Spring Boot backend, one package per feature:
                                        auth, browse, cluster, cli, connection, consumer,
                                        group, history, live, message, metrics, replay,
@@ -64,7 +64,7 @@ src/test/java/                         unit + embedded-Kafka integration suites
 cli/kview.mjs                          thin-client CLI (Node 18+, zero dependencies)
 mcp/kview-mcp.js                       MCP server for AI assistants
 docs/                                  release process, plans, historical reports
-```
+```text
 
 For quick manual verification without the UI, use the direct-mode CLI:
 `java -jar target/kview-1.1.0.jar --cli topics --bootstrap-server localhost:9092`.
@@ -82,7 +82,7 @@ Before submitting a Pull Request, please ensure all automated test suites pass.
 
 ```bash
 ./mvnw test
-```
+```text
 
 ### 2. End-to-End Functional Test Suite
 
@@ -90,19 +90,19 @@ With Kview running on `http://localhost:8090` and Kafka on `localhost:9092`:
 
 ```bash
 node scripts/e2e-test.mjs
-```
+```text
 
 ### 3. Negative & Boundary Testing
 
 ```bash
 node scripts/qa-negative-test.mjs
-```
+```text
 
 ### 4. MCP Server Smoke Test
 
 ```bash
 node scripts/mcp-smoke-test.mjs
-```
+```text
 
 ---
 

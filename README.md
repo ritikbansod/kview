@@ -302,8 +302,7 @@ lives in [docs/RELEASING.md](docs/RELEASING.md).
 ## Documentation
 
 | Document | What it covers |
-|---|---|
-| [COMPATIBILITY.md](COMPATIBILITY.md) | verified broker distributions, versions and security shapes |
+| --- | --- || [COMPATIBILITY.md](COMPATIBILITY.md) | verified broker distributions, versions and security shapes |
 | [SECURITY.md](SECURITY.md) | security policy, supported versions, built-in auth, vulnerability reporting |
 | [CHANGELOG.md](CHANGELOG.md) | every change per release |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, testing suites, PR guidelines |
