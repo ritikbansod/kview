@@ -94,6 +94,9 @@ configured. The full per-channel checklist lives in [RELEASING.md](RELEASING.md)
 - Spring Boot **3.3.4 → 3.5.16** (the 3.3 line is past OSS support end): Spring Framework
   6.2.x, Spring Security 6.5.x, spring-kafka 3.3.x, micrometer 1.15.x, **kafka-clients
   3.9.2**. Full suite green with zero test changes.
+- **Java package renamed** `com.ritikbansod.kafkawrapper` → `com.ritikbansod.kview` (main
+  class `KviewApplication`) — the project is now uniformly Kview; no behavior change, and
+  clone folders can be renamed to `kview` too.
 
 ## 6. Upgrading from v1.0.0
 
