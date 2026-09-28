@@ -49,13 +49,13 @@ It is pre-configured and optimized to run seamlessly on **Docker-based Kubernete
 
 ## File Structure
 
-- [00-crds.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/00-crds.yaml): Official Strimzi 1.2.0 CRDs (installed first to prevent schema errors).
-- [01-strimzi-operator.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/01-strimzi-operator.yaml): Strimzi 1.2.0 Cluster Operator configured for namespace `kafka`.
-- [02-kafka-cluster.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/02-kafka-cluster.yaml): Declares 3 controllers, 3 brokers (`KafkaNodePool`), and the 4 listeners.
-- [03-sample-user-topic.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/03-sample-user-topic.yaml): Declares `test-topic` (3 partitions, 3 replicas) and `test-mtls-user` (auto-issues mTLS certs).
-- [04-keycloak-oauth-mock.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/04-keycloak-oauth-mock.yaml): Self-contained Keycloak OIDC provider for out-of-the-box OAuth testing.
-- [kind-config.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/kind-config.yaml): Cluster configuration for Kind (Kubernetes in Docker) with port mappings.
-- [kustomization.yaml](file:///f:/FREELANCE/kafka-wrapper/example/strimzi/kustomization.yaml): Allows deploying the full stack with `kubectl apply -k example/strimzi/`.
+- [00-crds.yaml](00-crds.yaml): Official Strimzi 1.2.0 CRDs (installed first to prevent schema errors).
+- [01-strimzi-operator.yaml](01-strimzi-operator.yaml): Strimzi 1.2.0 Cluster Operator configured for namespace `kafka`.
+- [02-kafka-cluster.yaml](02-kafka-cluster.yaml): Declares 3 controllers, 3 brokers (`KafkaNodePool`), and the 4 listeners.
+- [03-sample-user-topic.yaml](03-sample-user-topic.yaml): Declares `test-topic` (3 partitions, 3 replicas) and `test-mtls-user` (auto-issues mTLS certs).
+- [04-keycloak-oauth-mock.yaml](04-keycloak-oauth-mock.yaml): Self-contained Keycloak OIDC provider for out-of-the-box OAuth testing.
+- [kind-config.yaml](kind-config.yaml): Cluster configuration for Kind (Kubernetes in Docker) with port mappings.
+- [kustomization.yaml](kustomization.yaml): Allows deploying the full stack with `kubectl apply -k example/strimzi/`.
 
 ---
 
