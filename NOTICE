@@ -1,0 +1,13 @@
+Kview
+Copyright 2026 Ritik Bansod
+
+This product includes software developed as part of the Kview project
+(https://github.com/ritikbansod/kview), licensed under the Apache License,
+Version 2.0 (LICENSE).
+
+Third-party dependencies are declared in pom.xml and their licenses are
+governed by their respective projects. Notably:
+
+  - io.confluent:kafka-protobuf-provider is distributed under the Confluent
+    Community License 1.0 and is consumed as an unmodified binary dependency
+    from https://packages.confluent.io/maven.

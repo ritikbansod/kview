@@ -1,3 +1,11 @@
+> [!STATUS]
+> **Mostly shipped.** Avro + JSON Schema codecs, wire-format sniffing, produce-time
+> validation and registry attachments shipped in v1.0.0; **Protobuf decode/encode** shipped
+> in v1.1.0. What remains from this plan is the **registry browser** (version diff,
+> compatibility mode, upload dry-run) — see the README roadmap.
+
+---
+
 # Schema Registry Integration — Deep Analysis & Full-Fledged Plan
 
 > Goal: make the Kview **schema-aware** for *every* schema registry in the wild —

@@ -1,8 +1,8 @@
-# Kview v1.1.0 — Release notes (final draft)
+# Kview v1.1.0 — Release notes
 
-> **Status:** draft. Everything below is implemented across ten stacked pull requests
-> (#1–#10) that originated in the v1.0.0 deep analysis. Merge them in order (#1 → #10),
-> follow [RELEASING.md](RELEASING.md), then tag `v1.1.0`.
+> **Status: published — [v1.1.0](https://github.com/ritikbansod/kview/releases/tag/v1.1.0).** Everything below shipped across ten stacked pull requests
+> (#1–#10) that originated in the v1.0.0 deep analysis. Historical note: they were
+> reviewed and merged in order (#1 → #10), with [RELEASING.md](RELEASING.md) driving the tag.
 
 ---
 
