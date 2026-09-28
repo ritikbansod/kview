@@ -87,6 +87,11 @@ public class SchemaRegistryService {
         settingsStore.delete(clusterId);
     }
 
+    /** In-memory attachment for CLI direct mode ({@code --schema-registry}) — never persisted. */
+    public void attachVolatile(String clusterId, SchemaRegistrySettings settings) {
+        settingsStore.attachVolatile(clusterId, settings);
+    }
+
     private SchemaRegistryAdapter adapterFor(SchemaRegistrySettings settings) {
         return adapters.stream()
                 .filter(a -> a.type().equalsIgnoreCase(settings.type()))

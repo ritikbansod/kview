@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Kview CLI (direct mode) — wraps the released/built kview jar.
+# Usage: kview topics --bootstrap-server localhost:9092
+# Point KVIEW_JAR at a specific jar, or drop this script next to kview-*.jar.
+DIR=$(cd "$(dirname "$0")" && pwd)
+JAR=${KVIEW_JAR:-$(ls -1 "$DIR"/kview-*.jar 2>/dev/null | sort | tail -1)}
+if [ -z "$JAR" ]; then
+  echo "kview jar not found in $DIR — build one (mvn package) or set KVIEW_JAR" >&2
+  exit 1
+fi
+exec java -jar "$JAR" --cli "$@"
