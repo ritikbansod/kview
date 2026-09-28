@@ -14,9 +14,11 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 
 ### Prerequisites
 - **Java 21** or later (Eclipse Temurin or OpenJDK recommended)
-- **Maven 3.9+**
 - **Node.js 18+** (for CLI, MCP server, and QA test scripts)
 - (Optional) Docker for running local Kafka brokers
+
+No Maven install needed — the repo ships the [Maven wrapper](https://maven.apache.org/wrapper/):
+use `./mvnw` (Linux/macOS) or `mvnw.cmd` (Windows). A pre-installed Maven 3.9+ works too.
 
 ### Building from Source
 
@@ -28,12 +30,12 @@ cd kview
 
 Build the executable JAR:
 ```bash
-mvn clean package
+./mvnw clean package
 ```
 
 Run Kview locally:
 ```bash
-java -jar target/kview-1.0.0.jar
+java -jar target/kview-1.1.0.jar
 ```
 Then open `http://localhost:8090` in your browser.
 
@@ -51,7 +53,7 @@ Before submitting a Pull Request, please ensure all automated test suites pass.
 
 ### 1. Java Unit & Embedded Integration Tests
 ```bash
-mvn test
+./mvnw test
 ```
 
 ### 2. End-to-End Functional Test Suite

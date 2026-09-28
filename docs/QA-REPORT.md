@@ -1,3 +1,9 @@
+> [!ARCHIVE]
+> **v1.0.0 QA record (2026-09-06), kept for history.** The suite has grown a lot since
+> (66 tests across 18 classes) — current quality gates live in `CONTRIBUTING.md` and CI.
+
+---
+
 # QA Report — Kview v1.0
 
 **Date:** 2026-09-06 · **Tester:** automated QA pass (LLM-driven, black-box + white-box)

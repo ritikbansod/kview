@@ -11,7 +11,7 @@
 | Layer | What Kview uses | Why it is portable |
 |---|---|---|
 | Protocol | `kafka-clients` (Apache, Apache-2.0) | Implements the official Kafka wire protocol with runtime `ApiVersions` negotiation — it adapts itself to whatever the broker announces. Strimzi, Confluent Platform, Confluent Cloud, Redpanda, MSK and Event Hubs all serve this same protocol. |
-| Version range | kafka-clients **3.7.1** | Clients negotiate down: officially compatible with brokers **2.1 → 4.x**. Live-verified in this repo against brokers 3.7.0, 3.7.1 **and** 4.3.1 (cross-major-version, newer broker than client). |
+| Version range | kafka-clients **3.9.2** | Clients negotiate down: officially compatible with brokers **2.1 → 4.x**. Live-verified against brokers 3.7.0, 3.7.1 **and** 4.3.1 with the earlier 3.7.1 client — re-verification on 3.9.2 via `scripts/verify-compatibility.mjs` is welcome. |
 | Security | `KafkaClientPropertiesFactory` → raw Kafka `ssl.*` / `sasl.*` properties | Covers every standard shape: PLAINTEXT, TLS (keystore files **or pasted PEM**), client-cert mTLS, SASL PLAIN / SCRAM-SHA-256 / SCRAM-SHA-512 / OAUTHBEARER, hostname-verification toggle. |
 | Authentication extras | `HttpOAuthBearerLoginCallbackHandler` | OAuth2 **client-credentials** against any OIDC provider (Keycloak, Entra ID, Okta, Auth0, Confluent Cloud OAuth) — tokens fetched and refreshed automatically, no Kafka-version-specific server code involved. |
 | Metadata/admin | `AdminClient` | Same portability as above: topic/config/group/ACL APIs exist on every distribution. |
