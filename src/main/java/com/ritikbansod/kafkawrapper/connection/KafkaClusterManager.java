@@ -38,11 +38,14 @@ public class KafkaClusterManager {
 
     private final ConnectionStore store;
     private final KafkaProperties springKafkaProperties;
+    private final org.springframework.boot.ssl.SslBundles sslBundles;
     private final Map<String, ClusterHandle> handles = new ConcurrentHashMap<>();
 
-    public KafkaClusterManager(ConnectionStore store, KafkaProperties springKafkaProperties) {
+    public KafkaClusterManager(ConnectionStore store, KafkaProperties springKafkaProperties,
+                               org.springframework.boot.ssl.SslBundles sslBundles) {
         this.store = store;
         this.springKafkaProperties = springKafkaProperties;
+        this.sslBundles = sslBundles;
     }
 
     public ConnectionProfile profileOf(String clusterId) {
@@ -134,9 +137,9 @@ public class KafkaClusterManager {
         consumerProps.put("auto.offset.reset", "earliest");
 
         if (builtIn) {
-            adminProps = springKafkaProperties.buildAdminProperties();
-            producerProps = springKafkaProperties.buildProducerProperties();
-            consumerProps = springKafkaProperties.buildConsumerProperties();
+            adminProps = springKafkaProperties.buildAdminProperties(sslBundles);
+            producerProps = springKafkaProperties.buildProducerProperties(sslBundles);
+            consumerProps = springKafkaProperties.buildConsumerProperties(sslBundles);
             // byte pipeline wins over yml-configured String serdes (raw fidelity for SR payloads)
             producerProps.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
             producerProps.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
