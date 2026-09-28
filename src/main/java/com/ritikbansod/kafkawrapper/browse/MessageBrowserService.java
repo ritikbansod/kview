@@ -158,7 +158,8 @@ public class MessageBrowserService {
         return result;
     }
 
-    private BrowserMessage toView(String clusterId, ConsumerRecord<byte[], byte[]> record) {
+    /** Maps a raw record to the API view (schema decode included) — shared with the background search. */
+    public BrowserMessage toView(String clusterId, ConsumerRecord<byte[], byte[]> record) {
         byte[] keyBytes = record.key();
         byte[] valueBytes = record.value();
         Map<String, String> headers = new LinkedHashMap<>();
@@ -178,7 +179,7 @@ public class MessageBrowserService {
                 schema);
     }
 
-    static String asText(byte[] bytes) {
+    public static String asText(byte[] bytes) {
         return bytes == null ? null : new String(bytes, StandardCharsets.UTF_8);
     }
 

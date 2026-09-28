@@ -18,7 +18,8 @@ final class MutationRequests implements RequestMatcher {
     static final MutationRequests INSTANCE = new MutationRequests();
 
     private static final PathMatcher ANT = new AntPathMatcher();
-    private static final List<String> READ_SHAPED_POSTS = List.of("/**/browse", "/**/decode", "/**/encode", "/**/test");
+    private static final List<String> READ_SHAPED_POSTS =
+            List.of("/**/browse", "/**/decode", "/**/encode", "/**/test", "/**/search");
 
     private MutationRequests() { }
 

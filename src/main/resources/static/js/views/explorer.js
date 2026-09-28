@@ -1,5 +1,5 @@
-// ===== Data Explorer: browse (seek-based), live tail (SSE), produce =====
-import { get, post, clusterPath, loadTopics, getToken } from '../api.js';
+// ===== Data Explorer: browse (seek-based), search (whole topic), live tail (SSE), produce =====
+import { get, post, put, del, clusterPath, loadTopics, getToken } from '../api.js';
 import {
   esc, fmtNum, fmtTs, fmtRel, badge, spinner, toast, modal, jsonBlock, previewValue, copyText, focusable, debounce,
 } from '../ui.js';
@@ -10,6 +10,8 @@ let tailTimer = null;
 export async function renderExplorer(view, query = {}) {
   window.__tailClose?.();
   window.__tailClose = null;
+  window.__searchClose?.();
+  window.__searchClose = null;
   if (tailTimer) { clearInterval(tailTimer); tailTimer = null; }
   view.innerHTML = spinner();
   const tab = query.tab || 'browse';
@@ -29,6 +31,7 @@ export async function renderExplorer(view, query = {}) {
     </div>
     <div class="btn-row mb16" id="ex-tabs">
       <button class="btn ${tab === 'browse' ? 'primary' : 'ghost'}" data-tab="browse">Browse</button>
+      <button class="btn ${tab === 'search' ? 'primary' : 'ghost'}" data-tab="search">Search</button>
       <button class="btn ${tab === 'tail' ? 'primary' : 'ghost'}" data-tab="tail">Live tail</button>
       <button class="btn ${tab === 'produce' ? 'primary' : 'ghost'}" data-tab="produce">Produce</button>
     </div>
@@ -45,7 +48,7 @@ export async function renderExplorer(view, query = {}) {
     (currentTab !== 'browse' ? `&tab=${currentTab}` : ''));
 
   const show = (which, autoRun = false) =>
-    ({ browse: renderBrowse, tail: renderTail, produce: renderProduce })[which](panel, topicSelect, () => partitionCount, autoRun);
+    ({ browse: renderBrowse, search: renderSearch, tail: renderTail, produce: renderProduce })[which](panel, topicSelect, () => partitionCount, autoRun);
 
   view.querySelector('#ex-tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-tab]');
@@ -272,6 +275,102 @@ function messageDetailModal(m) {
         document.querySelector('#ex-tabs [data-tab="produce"]')?.click();
       });
     },
+  });
+}
+
+// ---------------- Search (whole topic, background job) ----------------
+
+function renderSearch(panel, topicSelect, getPartitions) {
+  window.__searchClose?.();
+  panel.innerHTML = `
+    <div class="card">
+      <div class="toolbar">
+        <div class="field"><label>Partition</label><select id="se-partition">${partitionOptions(getPartitions())}</select></div>
+        <div class="field"><label>Value regex</label><input type="text" id="se-regex" placeholder='e.g. "orderId"\\s*:\\s*"ORD-[0-9]+' style="width:210px" /></div>
+        <div class="field"><label>Value contains</label><input type="text" id="se-value" style="width:130px" /></div>
+        <div class="field"><label>Key contains</label><input type="text" id="se-key" style="width:110px" /></div>
+        <div class="field"><label>From</label><input type="datetime-local" id="se-from" style="width:180px" /></div>
+        <div class="field"><label>To</label><input type="datetime-local" id="se-to" style="width:180px" /></div>
+        <div class="field"><label>Limit</label><input type="number" id="se-limit" value="100" min="1" max="1000" style="width:80px" /></div>
+        <div class="field"><label>&nbsp;</label>
+          <div class="btn-row">
+            <button class="btn primary" id="se-go">Search</button>
+            <button class="btn ghost" id="se-stop" disabled>■ Stop</button>
+          </div></div>
+      </div>
+      <div id="se-status" class="small muted">Scans every partition of the topic in the background — capped at 1000 results / 2M messages scanned. Read-only, never commits.</div>
+    </div>
+    <div class="card" id="se-results"><div class="empty-state">Run a search to see matches</div></div>`;
+
+  const statusEl = panel.querySelector('#se-status');
+  const resultsEl = panel.querySelector('#se-results');
+  const goBtn = panel.querySelector('#se-go');
+  const stopBtn = panel.querySelector('#se-stop');
+  let timer = null;
+
+  const stop = () => {
+    if (timer) { clearInterval(timer); timer = null; }
+    stopBtn.disabled = true;
+    goBtn.disabled = false;
+  };
+  window.__searchClose = () => { if (timer) { clearInterval(timer); timer = null; } };
+
+  stopBtn.addEventListener('click', async () => {
+    const id = stopBtn.dataset.searchId;
+    if (id) await del(clusterPath() + `/searches/${id}`).catch(() => { });
+    stop();
+  });
+
+  const paint = (results) => {
+    resultsEl.innerHTML = results.length === 0
+      ? '<div class="empty-state">No matches yet…</div>'
+      : `<div class="table-wrap"><table class="tbl msg-table">
+          <thead><tr><th class="num">Partition</th><th class="num">Offset</th><th>Time</th><th>Key</th><th>Value</th><th></th></tr></thead>
+          <tbody>${results.map((m, i) => `
+            <tr class="clickable" data-msg="${i}">
+              <td class="num">${m.partition}</td>
+              <td class="num mono">${m.offset}</td>
+              <td class="small muted">${fmtRel(m.timestamp)}</td>
+              <td class="mono small">${esc(m.key ?? 'null')}</td>
+              <td class="value-cell">${previewValue(m.value)}</td>
+              <td>${codecChip(m)}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    resultsEl.querySelectorAll('tr[data-msg]').forEach((tr) => {
+      tr.addEventListener('click', () => messageDetailModal(results[Number(tr.dataset.msg)]));
+    });
+  };
+
+  goBtn.addEventListener('click', async () => {
+    const topic = topicSelect.value;
+    const dt = (id) => { const v = panel.querySelector(id).value; return v ? new Date(v).getTime() : null; };
+    const body = {
+      partition: panel.querySelector('#se-partition').value === '' ? null : Number(panel.querySelector('#se-partition').value),
+      valueRegex: panel.querySelector('#se-regex').value.trim() || null,
+      valueContains: panel.querySelector('#se-value').value.trim() || null,
+      keyContains: panel.querySelector('#se-key').value.trim() || null,
+      fromTs: dt('#se-from'),
+      toTs: dt('#se-to'),
+      limit: Number(panel.querySelector('#se-limit').value) || 100,
+    };
+    try {
+      const { searchId } = await post(clusterPath() + `/topics/${encodeURIComponent(topic)}/search`, body);
+      stopBtn.dataset.searchId = searchId;
+      stopBtn.disabled = false;
+      goBtn.disabled = true;
+      timer = setInterval(async () => {
+        try {
+          const s = await get(clusterPath() + `/searches/${searchId}`);
+          statusEl.innerHTML = `<b>${esc(s.state)}</b> · partitions ${s.partitionsDone}/${s.partitionsTotal}` +
+            ` · scanned ${fmtNum(s.scanned)} · matched <b>${s.matched}</b>${s.limitReached ? ' · limit reached' : ''}` +
+            (s.error ? ` · <span class="error-panel">${esc(s.error)}</span>` : '');
+          paint(s.results || []);
+          if (s.state !== 'RUNNING') stop();
+        } catch (e) { statusEl.textContent = e.message; stop(); }
+      }, 600);
+    } catch (err) {
+      statusEl.textContent = err.message;
+    }
   });
 }
 
