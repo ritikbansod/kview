@@ -108,7 +108,8 @@ public class SchemaRegistryController {
             throw new IllegalArgumentException("payload is required");
         }
         SchemaRegistryService.EncodedPayload encoded = registryService.encode(clusterId, subject,
-                request.version(), request.payload(), key, Boolean.TRUE.equals(request.dryRun()));
+                request.version(), request.payload(), key, Boolean.TRUE.equals(request.dryRun()),
+                request.messageName());
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("valueBase64", encoded.valueBase64());
         body.put("schemaId", encoded.schemaId());
@@ -120,7 +121,7 @@ public class SchemaRegistryController {
         return body;
     }
 
-    public record EncodeRequestHolder(JsonNode payload, Integer version, Boolean dryRun) { }
+    public record EncodeRequestHolder(JsonNode payload, Integer version, Boolean dryRun, String messageName) { }
 
     /** Generates a sample JSON payload from the subject's schema. */
     @GetMapping("/api/clusters/{clusterId}/registry/subjects/{subject}/sample")

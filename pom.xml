@@ -21,11 +21,24 @@
     <java.version>21</java.version>
   </properties>
 
+  <repositories>
+    <!-- Confluent's schema-registry protobuf provider (runtime .proto parsing) -->
+    <repository>
+      <id>confluent</id>
+      <url>https://packages.confluent.io/maven</url>
+    </repository>
+  </repositories>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
       <version>1.11.3</version>
+    </dependency>
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>kafka-protobuf-provider</artifactId>
+      <version>8.3.2</version>
     </dependency>
     <dependency>
       <groupId>com.networknt</groupId>
