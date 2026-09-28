@@ -102,7 +102,12 @@ public class MessageBrowserService {
             String keyContains = lower(request.keyContains());
             String valueContains = lower(request.valueContains());
 
-            while (collected.size() < limit && System.currentTimeMillis() < deadline) {
+            // stop as soon as every assigned partition is exhausted, instead of
+            // polling until the deadline on topics smaller than the limit
+            Map<TopicPartition, Long> ends = consumer.endOffsets(partitions);
+            var notExhausted = new java.util.HashSet<>(partitions);
+
+            while (collected.size() < limit && !notExhausted.isEmpty() && System.currentTimeMillis() < deadline) {
                 var records = consumer.poll(POLL_INTERVAL);
                 for (ConsumerRecord<byte[], byte[]> record : records) {
                     if (keyContains != null && lower(asText(record.key())) != null
@@ -118,6 +123,7 @@ public class MessageBrowserService {
                         break;
                     }
                 }
+                notExhausted.removeIf(tp -> consumer.position(tp) >= ends.getOrDefault(tp, 0L));
             }
             collected.sort(Comparator
                     .comparingInt((ConsumerRecord<byte[], byte[]> r) -> r.partition())
@@ -128,7 +134,7 @@ public class MessageBrowserService {
                     .map(r -> toView(clusterId, r))
                     .toList();
             return new BrowseResult(topic, partitions.stream().map(TopicPartition::partition).sorted().toList(),
-                    messages, messages.size() < limit);
+                    messages, notExhausted.isEmpty());
         }
     }
 
