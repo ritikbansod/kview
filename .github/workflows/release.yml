@@ -273,7 +273,7 @@ jobs:
       - name: Attach bundles to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.ref_name }}" bundles/* --clobber
+        run: gh release upload "${{ github.ref_name }}" bundles/*.tar.gz bundles/*.zip bundles/*.sha256 bundles/dist-pkg/*.deb --clobber
 
       - name: Publish the npm package
         if: env.NPM_TOKEN != ''
