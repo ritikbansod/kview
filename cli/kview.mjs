@@ -127,7 +127,8 @@ Examples:  kview overview
   async clusters() {
     const out = await api('GET', '/api/clusters');
     if (JSON_OUT) { console.log(JSON.stringify(out, null, 2)); return; }
-    table(out, [
+    const rows = out.map((c) => ({ ...c, securityProtocol: c.security?.protocol || 'PLAINTEXT' }));
+    table(rows, [
       { title: 'ID', key: 'id' }, { title: 'NAME', key: 'name' },
       { title: 'BOOTSTRAP', key: 'bootstrapServers' },
       { title: 'SECURITY', key: 'securityProtocol' },
@@ -257,7 +258,7 @@ Examples:  kview overview
     const out = await api('GET', clusterPath(`/groups/${encodeURIComponent(group)}`));
     if (JSON_OUT) { console.log(JSON.stringify(out, null, 2)); return; }
     console.log(`group ${out.groupId}  state=${out.state}  members=${(out.members ?? []).length}`);
-    for (const [topic, parts] of Object.entries(out.byTopic ?? {})) {
+    for (const [topic, parts] of Object.entries(out.partitionsByTopic ?? {})) {
       for (const p of parts) {
         console.log(`  ${topic} p${p.partition}  committed=${p.committedOffset}  end=${p.endOffset ?? '?'}  lag=${p.lag}`);
       }

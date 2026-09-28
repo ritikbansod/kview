@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Persists per-cluster schema-registry attachments to {@code registries.json}
@@ -26,7 +27,9 @@ public class RegistrySettingsStore {
 
     private final Path file;
     private final ObjectMapper mapper;
-    private final Map<String, SchemaRegistrySettings> byCluster = new LinkedHashMap<>();
+    // ConcurrentHashMap: find() runs unsynchronized on the hot decode path while
+    // put()/delete() structurally mutate the map under the persist() monitor
+    private final Map<String, SchemaRegistrySettings> byCluster = new ConcurrentHashMap<>();
 
     public RegistrySettingsStore(@Value("${kview.data-dir:./data}") String dataDir,
                                  ObjectMapper mapper) {

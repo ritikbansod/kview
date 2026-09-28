@@ -2,6 +2,7 @@ package com.ritikbansod.kafkawrapper.consumer;
 
 import com.ritikbansod.kafkawrapper.connection.ClusterHandle;
 import com.ritikbansod.kafkawrapper.connection.KafkaClusterManager;
+import jakarta.annotation.PreDestroy;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -37,7 +38,7 @@ public class DynamicConsumerService {
         this.manager = manager;
     }
 
-    public Map<String, String> subscribe(String clusterId, String groupId, String topic) {
+    public synchronized Map<String, String> subscribe(String clusterId, String groupId, String topic) {
         String containerId = containerId(clusterId, groupId, topic);
         if (containers.containsKey(containerId)) {
             return Map.of("consumer", containerId, "status", "already-running");
@@ -60,14 +61,26 @@ public class DynamicConsumerService {
         return Map.of("consumer", containerId, "status", "started");
     }
 
-    public Map<String, String> unsubscribe(String clusterId, String groupId, String topic) {
+    public synchronized Map<String, String> unsubscribe(String clusterId, String groupId, String topic) {
         String containerId = containerId(clusterId, groupId, topic);
         ConcurrentMessageListenerContainer<byte[], byte[]> container = containers.remove(containerId);
         if (container == null) {
             return Map.of("consumer", containerId, "status", "not-running");
         }
         container.stop();
+        boolean groupStillSubscribed = containers.keySet().stream()
+                .anyMatch(id -> id.startsWith(clusterId + ":" + groupId + ":"));
+        if (!groupStillSubscribed) {
+            receivedByGroup.remove(groupId);
+        }
         return Map.of("consumer", containerId, "status", "stopped");
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        containers.forEach((id, container) -> container.stop());
+        containers.clear();
+        receivedByGroup.clear();
     }
 
     public List<ReceivedMessage> received(String groupId) {

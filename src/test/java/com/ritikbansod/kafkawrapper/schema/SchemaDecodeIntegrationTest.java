@@ -45,7 +45,7 @@ class SchemaDecodeIntegrationTest {
     static void props(DynamicPropertyRegistry registry) {
         registry.add("spring.kafka.bootstrap-servers",
                 () -> System.getProperty("spring.embedded.kafka.brokers"));
-        registry.add("kafka-wrapper.data-dir", () -> "target/sr-test-data");
+        registry.add("kview.data-dir", () -> "target/sr-test-data");
     }
 
     @Autowired

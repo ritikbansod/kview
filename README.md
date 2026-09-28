@@ -106,12 +106,12 @@ node cli/kview.mjs produce orders -k k1 -v '{"orderId":42}' -H source=ci
 node cli/kview.mjs topic-create my-topic --partitions 3 --rf 3
 node cli/kview.mjs groups                                # consumer groups + lag
 node cli/kview.mjs lag my-group
-node cli/kview.mjs reset-offsets my-group latest
+node cli/kview.mjs reset-offsets my-group --topic orders --mode latest
 ```
 
 Point it at another server with `--server http://host:port` (or env `KVIEW_URL`) and
 another cluster with `--cluster ID` (env `KVIEW_CLUSTER`). `--json` gives raw output for
-scripting. A second client, `kview-cli.js`, ships in the repo with a similar command set.
+scripting.
 
 ### 3. MCP server (AI assistants)
 
@@ -184,10 +184,9 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 
 ## Roadmap
 
-- Schema Registry support, design in [SCHEMA-REGISTRY-PLAN.md](SCHEMA-REGISTRY-PLAN.md)
 - Message replay: copy a filtered set of messages to another topic or cluster
 - Prometheus metrics for lag and produce rate
-- Authentication for the API itself
+- Authentication for the API itself (Schema Registry support for Avro and JSON Schema shipped in v1.0.0)
 
 ## Contributing
 
