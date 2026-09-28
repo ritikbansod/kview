@@ -299,6 +299,17 @@ for development guidelines. If you want to check compatibility against a distrib
 Maintainers: cutting a release is a version bump + one tag — the full per-channel checklist
 lives in [docs/RELEASING.md](docs/RELEASING.md).
 
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [COMPATIBILITY.md](COMPATIBILITY.md) | verified broker distributions, versions and security shapes |
+| [SECURITY.md](SECURITY.md) | security policy, supported versions, built-in auth, vulnerability reporting |
+| [CHANGELOG.md](CHANGELOG.md) | every change per release |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, testing suites, PR guidelines |
+| [docs/RELEASING.md](docs/RELEASING.md) | how releases are cut and published (jar, bundles, npm, Docker, Homebrew) |
+| [docs/SCHEMA-REGISTRY-PLAN.md](docs/SCHEMA-REGISTRY-PLAN.md) | design notes behind the Schema Registry support |
+
 ## License
 
 This project is licensed under the [Apache License, Version 2.0](LICENSE).

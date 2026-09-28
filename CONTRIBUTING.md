@@ -52,6 +52,26 @@ If you don't have an existing Kafka cluster, start a local KRaft broker with:
 docker compose up -d kafka
 ```
 
+### Project Structure
+
+```
+src/main/java/com/ritikbansod/kview/   Spring Boot backend, one package per feature:
+                                       auth, browse, cluster, cli, connection, consumer,
+                                       group, history, live, message, metrics, replay,
+                                       schema, topic, web
+src/main/resources/static/             the web UI (vanilla JS, no build step)
+src/test/java/                         unit + embedded-Kafka integration suites
+cli/kview.mjs                          thin-client CLI (Node 18+, zero dependencies)
+mcp/kview-mcp.js                       MCP server for AI assistants
+docs/                                  release process, plans, historical reports
+```
+
+For quick manual verification without the UI, use the direct-mode CLI:
+`java -jar target/kview-1.1.0.jar --cli topics --bootstrap-server localhost:9092`.
+
+> Found a security vulnerability? Please **do not open a public issue** — see
+> [SECURITY.md](SECURITY.md) for the private reporting process.
+
 ---
 
 ## Testing & Verification
