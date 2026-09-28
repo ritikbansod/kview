@@ -11,7 +11,7 @@ Cutting a release is a version bump + one tag; the release workflow does the res
 | GitHub bundles | nothing | jar + Linux/macOS/Windows jpackage bundles + Linux `.deb` attach to the release |
 | npm | add a repo secret `NPM_TOKEN` (an npm automation token for the `kview` package) | the `Publish the npm package` step is skipped while the secret is absent |
 | Homebrew | create a tap repo (default `ritikbansod/homebrew-kview`) and add repo secrets `HOMEBREW_TAP_TOKEN` (a fine-grained PAT with write access to the tap) and optionally `HOMEBREW_TAP_REPO` | the formula is rendered from `packaging/homebrew/kview.rb.tmpl` and pushed to `tap/Formula/kview.rb` |
-| SDKMAN | after the release, submit the Linux bundle URL at https://vendors.sdkman.io (candidate `kview`, version, `https://github.com/ritikbansod/kview/releases/download/vX.Y.Z/kview-X.Y.Z-linux-x64.tar.gz`) | manual, one form per release |
+| SDKMAN | **deferred** — nothing to configure; submit later at https://vendors.sdkman.io (candidate `kview`, version, `https://github.com/ritikbansod/kview/releases/download/vX.Y.Z/kview-X.Y.Z-linux-x64.tar.gz`) if/when there is user demand | manual, one form per release; the release pipeline has no dependency on it |
 
 ## Release checklist
 
