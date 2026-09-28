@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **API authentication with roles** (`kview.auth.*`, off by default): `token` mode (static bearer tokens) and `oidc` mode (JWTs from any issuer, configurable role claim), each with an **admin** and a **read-only** role — reads for everyone, mutations (produce, topic/group management, offset resets, connection management) admin-only. The web UI prompts for the token (🔑 in the top bar), the CLI takes `--token`/`KVIEW_TOKEN`, the MCP server takes `KVIEW_TOKEN`. In authenticated modes CORS is closed unless `KVIEW_AUTH_ALLOWED_ORIGINS` lists origins; the static UI and `/actuator/health` stay public. See the new Authentication section in the README.
+
 ### Fixed
 - **MCP server**: `mcp/kview-mcp.js` crashed on startup with `SyntaxError: Cannot use import statement outside a module` on Node ≤ 22.6 (ESM in a `.js` file with no `package.json`) — fixed by shipping `mcp/package.json` with `"type": "module"`.
 - **CLI**: `kview lag <group>` read a non-existent `byTopic` field and silently printed no per-partition lag rows — now reads `partitionsByTopic`, as the API serializes it.

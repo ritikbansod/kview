@@ -52,8 +52,8 @@ consumer group, so it is safe to point at production topics.
 
 ## Three ways to use it
 
-> [!WARNING]
-> **Network Security:** Kview has no built-in authentication on its REST API and binds to `127.0.0.1` by default. If deploying to a shared server or network, place it behind an authenticating reverse proxy (e.g., OAuth2-Proxy, NGINX, Caddy, Cloudflare Access). See [SECURITY.md](SECURITY.md) for details.
+> [!NOTE]
+> **Network Security:** Kview binds to `127.0.0.1` by default and the API is unauthenticated in that mode — fine for a single-user machine. For shared servers, enable the built-in authentication (`KVIEW_AUTH_MODE=token` or `oidc`, see [Authentication](#authentication)) or place it behind an authenticating reverse proxy. See [SECURITY.md](SECURITY.md) for details.
 
 ### 1. Web UI
 
@@ -111,7 +111,7 @@ node cli/kview.mjs reset-offsets my-group --topic orders --mode latest
 
 Point it at another server with `--server http://host:port` (or env `KVIEW_URL`) and
 another cluster with `--cluster ID` (env `KVIEW_CLUSTER`). `--json` gives raw output for
-scripting.
+scripting. If the server runs with authentication enabled, add `--token <T>` (env `KVIEW_TOKEN`).
 
 ### 3. MCP server (AI assistants)
 
@@ -147,7 +147,7 @@ claude mcp add kview -- node /absolute/path/to/kview/mcp/kview-mcp.js
 
 Any other stdio MCP client works the same way: command `node`, args
 `["/absolute/path/to/kview/mcp/kview-mcp.js"]`, env `KVIEW_URL` (and optional
-`KVIEW_CLUSTER`, default `default`). Check your setup without a client:
+`KVIEW_CLUSTER`, default `default`; `KVIEW_TOKEN` when the server runs with authentication). Check your setup without a client:
 
 ```bash
 node scripts/mcp-smoke-test.mjs   # 25 checks incl. produce -> browse round-trip
@@ -180,13 +180,59 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | bootstrap servers of the default cluster |
 | `KVIEW_BIND` | `127.0.0.1` | address to bind to (`0.0.0.0` in Docker container) |
 | `KVIEW_DATA_DIR` | `./data` | where connections.json is stored |
+| `KVIEW_AUTH_MODE` | `none` | API authentication: `none`, `token` (static bearer tokens) or `oidc` (JWT from any OIDC issuer) — see [Authentication](#authentication) |
+| `KVIEW_AUTH_TOKENS` | — | token mode: comma-separated `TOKEN` (= admin) or `TOKEN:readonly` entries |
+| `KVIEW_AUTH_ALLOWED_ORIGINS` | — | authenticated modes: browser origins allowed to call the API cross-origin (default: none — CORS is closed) |
 | `server.port` (application.yml) | `8090` | http port |
+
+## Authentication
+
+The API is open by default — safe on the loopback binding for a single user. For shared
+deployments, `KVIEW_AUTH_MODE` enables bearer-token authentication with two roles:
+**admin** (everything) and **read-only** (dashboard, browse, tail; produce, topic
+create/delete/edit, offset resets, group deletion and connection management are refused).
+
+**Token mode** — static tokens, no external dependency:
+
+```bash
+KVIEW_AUTH_MODE=token KVIEW_AUTH_TOKENS="team-admin-secret,ci-viewer-secret:readonly" java -jar kview.jar
+```
+
+Every request must then send `Authorization: Bearer <token>`:
+
+```bash
+curl -H "Authorization: Bearer team-admin-secret" http://localhost:8090/api/clusters
+```
+
+**OIDC mode** — JWTs from any issuer (Keycloak, Entra ID, Okta, …). The role claim decides
+admin vs read-only; every other valid token is read-only:
+
+```yaml
+kview:
+  auth:
+    mode: oidc
+    audience: kview-api          # optional: require this aud claim
+    admin-role-claim: roles      # claim inspected for admin-role-value
+    admin-role-value: kview-admin
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://id.example.com/realms/kview
+```
+
+(env equivalents: `KVIEW_AUTH_MODE=oidc`, `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI`, `KVIEW_AUTH_AUDIENCE`)
+
+Clients: the web UI prompts for the token (🔑 button in the top bar), the CLI takes
+`--token <T>` / `KVIEW_TOKEN`, and the MCP server takes `KVIEW_TOKEN`. In authenticated
+modes CORS is closed unless you list browser origins in `KVIEW_AUTH_ALLOWED_ORIGINS`.
 
 ## Roadmap
 
 - Message replay: copy a filtered set of messages to another topic or cluster
 - Prometheus metrics for lag and produce rate
-- Authentication for the API itself (Schema Registry support for Avro and JSON Schema shipped in v1.0.0)
+- Protobuf decoding for Schema Registry topics (Avro and JSON Schema shipped)
 
 ## Contributing
 

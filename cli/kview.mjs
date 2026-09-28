@@ -32,12 +32,16 @@ const num = (name) => flags[name] === undefined ? undefined : Number(flags[name]
 
 const clusterPath = (suffix = '') => `/api/clusters/${encodeURIComponent(CLUSTER)}${suffix}`;
 
+// API bearer token: --token flag or KVIEW_TOKEN (needed when the server runs with kview.auth.mode != none)
+const TOKEN = typeof flags.token === 'string' && flags.token ? flags.token : (process.env.KVIEW_TOKEN || '');
+const authHeaders = () => (TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {});
+
 async function api(method, path, body) {
   let res;
   try {
     res = await fetch(SERVER + path, {
       method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: { ...authHeaders(), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (e) {
@@ -110,6 +114,7 @@ Groups:    groups | lag <group> | reset-offsets <group> --topic T --mode earlies
 
 Options:   --server URL (-s)   Kview server   [KVIEW_URL, default http://localhost:8090]
            --cluster ID (-c)   cluster id     [KVIEW_CLUSTER, default "default"]
+           --token T           API bearer token (auth-enabled servers) [KVIEW_TOKEN]
            --json (-j)         raw JSON output
 
 Examples:  kview overview
@@ -223,7 +228,9 @@ Examples:  kview overview
     const topic = positional[1] ?? fail('usage: kview tail <topic> [--from latest|earliest] [--partition N]');
     const qs = new URLSearchParams({ from: flags.from ?? 'latest' });
     if (flags.partition !== undefined) qs.set('partition', String(flags.partition));
-    const res = await fetch(`${SERVER}${clusterPath(`/topics/${encodeURIComponent(topic)}/tail`)}?${qs}`);
+    const res = await fetch(`${SERVER}${clusterPath(`/topics/${encodeURIComponent(topic)}/tail`)}?${qs}`, {
+      headers: authHeaders(),
+    });
     if (!res.ok || !res.body) fail(`HTTP ${res.status} while opening tail`);
     console.error(`tailing ${topic} (${flags.from ?? 'latest'}) — Ctrl+C to stop`);
     const dec = new TextDecoder();

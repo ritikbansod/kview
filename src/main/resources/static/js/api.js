@@ -1,16 +1,41 @@
 // ===== API client + global store =====
 
+const TOKEN_KEY = 'kview.token';
+
 export const store = {
   clusterId: localStorage.getItem('kw.cluster') || 'default',
   clusters: [],
 };
 
-export async function api(method, path, body) {
+export const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
+
+export function setToken(token) {
+  if (token && token.trim()) localStorage.setItem(TOKEN_KEY, token.trim());
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+function headers(body) {
+  const h = {};
+  const token = getToken();
+  if (token) h.Authorization = `Bearer ${token}`;
+  if (body !== undefined) h['Content-Type'] = 'application/json';
+  return h;
+}
+
+export async function api(method, path, body, retry = true) {
   const res = await fetch('/api' + path, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers: headers(body),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401 && retry) {
+    const entered = prompt('This Kview server requires an API token.\n'
+      + 'Enter a token configured in KVIEW_AUTH_TOKENS on the server:');
+    if (entered !== null && entered.trim()) {
+      setToken(entered);
+      return api(method, path, body, false);
+    }
+  }
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
     try {

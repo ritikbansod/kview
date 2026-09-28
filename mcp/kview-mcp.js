@@ -12,11 +12,13 @@
 // Environment:
 //   KVIEW_URL      base URL of the kview server   (default http://localhost:8090)
 //   KVIEW_CLUSTER  default cluster/connection id  (default "default")
+//   KVIEW_TOKEN    API bearer token               (needed when the server runs with kview.auth.mode != none)
 
 import { createInterface } from 'node:readline';
 
 const KVIEW_URL = (process.env.KVIEW_URL || 'http://localhost:8090').replace(/\/+$/, '');
 const DEFAULT_CLUSTER = process.env.KVIEW_CLUSTER || 'default';
+const TOKEN = process.env.KVIEW_TOKEN || '';
 const VERSION = '1.0.0';
 const MAX_VALUE_CHARS = 4000; // per-string truncation inside tool output
 
@@ -30,8 +32,12 @@ async function api(path, options = {}) {
   let res;
   try {
     res = await fetch(KVIEW_URL + path, {
-      headers: { 'Content-Type': 'application/json' },
       ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+        ...(options.headers || {}),
+      },
     });
   } catch (e) {
     throw new Error(`Kview is not reachable at ${KVIEW_URL} (${e.message}). Is the kview process running?`);
