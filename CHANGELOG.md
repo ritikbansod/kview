@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.1.0] - 2026-09-28
 
 ### Added
 - **Distribution channels** (jar, native bundles, npm, Docker, Homebrew, SDKMAN): each release now ships jpackage native bundles with a bundled JRE for Linux (tar.gz + .deb), macOS (tar.gz) and Windows (zip) — server launcher plus a `kview` direct-CLI wrapper, no Java install needed; an npm `kview` package (thin client + `kview-mcp`, direct mode when a jar/`KVIEW_JAR` is present); Docker CLI passthrough; a Homebrew formula template pushed to the tap on release; and `docs/RELEASING.md` with the full per-channel checklist (including the manual SDKMAN submission). Release steps for npm/Homebrew activate when their repo secrets (`NPM_TOKEN`, `HOMEBREW_TAP_TOKEN`) are configured.

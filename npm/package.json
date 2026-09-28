@@ -1,6 +1,6 @@
 {
   "name": "kview",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Kview CLI and MCP server for Apache Kafka — thin client for a Kview server, plus the MCP server for AI assistants. Direct-to-broker mode works with the kview jar (KVIEW_JAR).",
   "license": "Apache-2.0",
   "homepage": "https://github.com/ritikbansod/kview",

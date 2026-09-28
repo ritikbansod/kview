@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="https://github.com/ritikbansod/kview/actions/workflows/ci.yml"><img src="https://github.com/ritikbansod/kview/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/ritikbansod/kview/releases"><img src="https://img.shields.io/badge/release-v1.0.0-green.svg" alt="Release: v1.0.0"></a>
+  <a href="https://github.com/ritikbansod/kview/releases"><img src="https://img.shields.io/badge/release-v1.1.0-green.svg" alt="Release: v1.1.0"></a>
 </p>
 
 # Kview
@@ -85,15 +85,15 @@ docker compose up -d
 ```
 
 **Option B — Standalone JAR (needs Java 21+):**
-Download `kview-1.0.0.jar` from [Releases](https://github.com/ritikbansod/kview/releases):
+Download `kview-1.1.0.jar` from [Releases](https://github.com/ritikbansod/kview/releases):
 ```bash
-java -jar kview-1.0.0.jar
+java -jar kview-1.1.0.jar
 ```
 
 **Option C — Build from source (needs Java 21 and Maven):**
 ```bash
 mvn package
-java -jar target/kview-1.0.0.jar
+java -jar target/kview-1.1.0.jar
 ```
 
 Then open http://localhost:8090. It connects to `localhost:9092` by default, set

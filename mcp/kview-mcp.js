@@ -21,7 +21,7 @@ const DEFAULT_CLUSTER = process.env.KVIEW_CLUSTER || 'default';
 const TOKEN = process.env.KVIEW_TOKEN || '';
 // optional per-tool allowlist: KVIEW_ALLOWED_TOOLS="kview_overview,kview_browse" — only these tools are served
 const ALLOWED_TOOLS = (process.env.KVIEW_ALLOWED_TOOLS || '').split(',').map((s) => s.trim()).filter(Boolean);
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const MAX_VALUE_CHARS = 4000; // per-string truncation inside tool output
 
 function log(msg) {
