@@ -147,7 +147,9 @@ claude mcp add kview -- node /absolute/path/to/kview/mcp/kview-mcp.js
 
 Any other stdio MCP client works the same way: command `node`, args
 `["/absolute/path/to/kview/mcp/kview-mcp.js"]`, env `KVIEW_URL` (and optional
-`KVIEW_CLUSTER`, default `default`; `KVIEW_TOKEN` when the server runs with authentication). Check your setup without a client:
+`KVIEW_CLUSTER`, default `default`; `KVIEW_TOKEN` when the server runs with authentication;
+`KVIEW_ALLOWED_TOOLS` restricts the served tools to a comma-separated allowlist, e.g. only
+read-only tools for an AI agent). Check your setup without a client:
 
 ```bash
 node scripts/mcp-smoke-test.mjs   # 25 checks incl. produce -> browse round-trip
@@ -183,6 +185,8 @@ browser. The API returns masked values, and saving a masked value keeps the stor
 | `KVIEW_AUTH_MODE` | `none` | API authentication: `none`, `token` (static bearer tokens) or `oidc` (JWT from any OIDC issuer) — see [Authentication](#authentication) |
 | `KVIEW_AUTH_TOKENS` | — | token mode: comma-separated `TOKEN` (= admin) or `TOKEN:readonly` entries |
 | `KVIEW_AUTH_ALLOWED_ORIGINS` | — | authenticated modes: browser origins allowed to call the API cross-origin (default: none — CORS is closed) |
+| `KVIEW_READONLY` | `false` | global read-only mode: every mutation is refused, for all clients and roles (UI shows a banner) |
+| `KVIEW_AUDIT` | `false` | append `<data-dir>/audit.log` JSONL line per mutation: who (client), what (method + path), outcome (status) |
 | `server.port` (application.yml) | `8090` | http port |
 
 ## Authentication
@@ -227,6 +231,22 @@ spring:
 Clients: the web UI prompts for the token (🔑 button in the top bar), the CLI takes
 `--token <T>` / `KVIEW_TOKEN`, and the MCP server takes `KVIEW_TOKEN`. In authenticated
 modes CORS is closed unless you list browser origins in `KVIEW_AUTH_ALLOWED_ORIGINS`.
+
+### Read-only mode & audit trail
+
+Two more switches pair with authentication for a production- or AI-safe setup:
+
+- **`KVIEW_READONLY=true`** — global read-only: every mutation (produce, topic
+  create/delete/edit, offset resets, group deletion, connection management) is refused with
+  a clear 403, for all clients and all roles, while browsing/tailing/dashboards keep
+  working. The web UI shows a banner; `GET /api/meta` reports `{"readonly":true,...}` for scripts.
+- **`KVIEW_AUDIT=true`** — append-only audit trail: every mutation is logged as one JSONL
+  line in `<data-dir>/audit.log` with the sending client (`X-Kview-Client`, e.g.
+  `kview-mcp/1.0.0` for AI agents, `kview-cli/…`, `kview-ui`), the full path (cluster +
+  topic + action) and the response status. Message payloads are never logged.
+
+All three official clients identify themselves with an `X-Kview-Client` header, so an
+agent's writes are distinguishable from a human's in the audit log.
 
 ## Roadmap
 

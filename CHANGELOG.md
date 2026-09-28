@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **API authentication with roles** (`kview.auth.*`, off by default): `token` mode (static bearer tokens) and `oidc` mode (JWTs from any issuer, configurable role claim), each with an **admin** and a **read-only** role — reads for everyone, mutations (produce, topic/group management, offset resets, connection management) admin-only. The web UI prompts for the token (🔑 in the top bar), the CLI takes `--token`/`KVIEW_TOKEN`, the MCP server takes `KVIEW_TOKEN`. In authenticated modes CORS is closed unless `KVIEW_AUTH_ALLOWED_ORIGINS` lists origins; the static UI and `/actuator/health` stay public. See the new Authentication section in the README.
+- **AI/MCP safety pack**: global read-only mode (`KVIEW_READONLY=true` — every mutation refused for all clients and roles, UI shows a banner), an append-only mutation audit trail (`KVIEW_AUDIT=true` → `<data-dir>/audit.log` JSONL with client, method, path and status; all three clients send an `X-Kview-Client` identifier), a public `GET /api/meta` endpoint, and a per-tool allowlist for the MCP server (`KVIEW_ALLOWED_TOOLS`, e.g. serve only read-only tools to an AI agent).
 
 ### Fixed
 - **MCP server**: `mcp/kview-mcp.js` crashed on startup with `SyntaxError: Cannot use import statement outside a module` on Node ≤ 22.6 (ESM in a `.js` file with no `package.json`) — fixed by shipping `mcp/package.json` with `"type": "module"`.

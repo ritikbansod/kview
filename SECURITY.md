@@ -28,6 +28,10 @@ resets, group deletion and connection management require the **admin** role. COR
 bar), the CLI takes `--token` / `KVIEW_TOKEN`, and the MCP server takes `KVIEW_TOKEN`. Cluster
 secrets stay server-side and masked in responses regardless of mode.
 
+### Read-only mode & audit trail
+- `KVIEW_READONLY=true` disables every mutation server-side — for all clients (UI, CLI, MCP agents) and all roles. Pair it with `KVIEW_AUTH_MODE` for an explore-only deployment, or run it alone to turn a shared Kview into a pure viewer.
+- `KVIEW_AUDIT=true` appends one JSONL line per mutation to `<data-dir>/audit.log`: timestamp, client identification (`X-Kview-Client` — `kview-mcp/x.y.z` for AI agents, `kview-cli`, `kview-ui`), method, full path (cluster, topic, action) and response status. Message payloads are never logged. Restrict the MCP server further with `KVIEW_ALLOWED_TOOLS` (comma-separated tool allowlist).
+
 ### Default Loopback Binding
 To prevent inadvertent exposure on shared servers or cloud VMs, Kview binds to **`127.0.0.1`** by default (`server.address: ${KVIEW_BIND:127.0.0.1}`).
 - When running in Docker containers, `KVIEW_BIND` is set to `0.0.0.0` so that ports can be forwarded explicitly.
