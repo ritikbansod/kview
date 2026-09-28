@@ -122,12 +122,15 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux-x64
+            content: kview
             pack: tar
           - os: macos-latest
             platform: macos-aarch64
+            content: kview.app
             pack: tar
           - os: windows-latest
             platform: windows-x64
+            content: kview
             pack: zip
     steps:
       - name: Checkout code
@@ -173,8 +176,9 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          printf '#!/usr/bin/env bash\nexec "$(cd "$(dirname "$0")" && pwd)/kview.app/Contents/MacOS/kview" --cli "$@"\n' > dist/kview/kview
-          chmod +x dist/kview/kview
+          # macOS app-image output is kview.app (not a dist/kview/ directory)
+          printf '#!/usr/bin/env bash\nexec "$(cd "$(dirname "$0")" && pwd)/kview.app/Contents/MacOS/kview" --cli "$@"\n' > dist/kview-cli
+          chmod +x dist/kview-cli
 
       - name: Add the direct-CLI launcher (windows)
         if: matrix.os == 'windows-latest'
@@ -206,14 +210,14 @@ jobs:
         shell: bash
         run: |
           VERSION="${{ needs.build.outputs.version }}"
-          tar -czf "kview-${VERSION}-${{ matrix.platform }}.tar.gz" -C dist kview
+          tar -czf "kview-${VERSION}-${{ matrix.platform }}.tar.gz" -C dist "${{ matrix.content }}"
 
       - name: Pack the bundle (zip)
         if: matrix.pack == 'zip'
         shell: pwsh
         run: |
           $version = "${{ needs.build.outputs.version }}"
-          Compress-Archive -Path dist/kview -DestinationPath "kview-$version-${{ matrix.platform }}.zip"
+          Compress-Archive -Path "dist/${{ matrix.content }}" -DestinationPath "kview-$version-${{ matrix.platform }}.zip"
 
       - name: Checksum the bundle (linux)
         if: matrix.pack == 'tar' && matrix.os == 'ubuntu-latest'
